@@ -37,7 +37,7 @@ mod_ic50table_server <- function(id, summary_data, cfg) {
     display_table <- reactive({
       req(summary_data())
       d <- summary_data()
-      base_cols  <- c("sample_id", "serotype", "plate")
+      base_cols  <- c("sample_id", "serotype", "plate", "ic50_report")
       extra_cols <- c()
       if ("ic50" %in% input$show_cols) extra_cols <- c(extra_cols, "ic50_display")
       if ("inv_ic50" %in% input$show_cols) extra_cols <- c(extra_cols, "inv_ic50_display")
@@ -45,7 +45,7 @@ mod_ic50table_server <- function(id, summary_data, cfg) {
       if ("r_squared" %in% input$show_cols) extra_cols <- c(extra_cols, "r_squared")
       if ("ci" %in% input$show_cols) extra_cols <- c(extra_cols, "ci_lower", "ci_upper")
       if ("qc_status" %in% input$show_cols) extra_cols <- c(extra_cols, "qc_status")
-      if ("ic50_type" %in% input$show_cols) extra_cols <- c(extra_cols, "ic50_type")
+      if ("ic50_type" %in% input$show_cols) extra_cols <- c(extra_cols, "ic50_type", "ic50_classification")
       if ("flags" %in% input$show_cols) extra_cols <- c(extra_cols, "flags")
 
       d <- d %>% dplyr::select(dplyr::any_of(c(base_cols, extra_cols)))

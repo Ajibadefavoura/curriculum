@@ -136,22 +136,20 @@ mod_charts_server <- function(id, summary_data, conc_units, ic50_cap) {
           !grepl("^mock$", sample_id, ignore.case = TRUE)
         ) %>%
         dplyr::mutate(
-          # Strip every non-numeric symbol so "> 20000", "20,000",
-          # "✗ 20000 ng/mL" etc. all become a clean number.
-          ic50_clean   = gsub("[^[:digit:].eE+-]", "", as.character(ic50_display)),
-          numeric_ic50 = suppressWarnings(as.numeric(ic50_clean))
-        ) %>%
-        dplyr::mutate(
-          # Inactive / NA / failed samples get capped to ic50_cap
-          # so they appear as zero-potency bars instead of disappearing.
+          numeric_ic50 = suppressWarnings(as.numeric(ic50)),
+          # Capped, censored, and solver-pathology rows all become
+          # the cap value so that "low potency" still shows up as
+          # a small bar instead of vanishing from the plot.
           numeric_ic50 = dplyr::if_else(
-            is.na(numeric_ic50) |
+            !is.finite(numeric_ic50) |
               grepl("Inactive", as.character(qc_status), ignore.case = TRUE) |
               grepl("FAIL",     as.character(qc_status), ignore.case = TRUE),
             as.numeric(ic50_cap()),
             numeric_ic50
           ),
-          numeric_ic50 = dplyr::if_else(numeric_ic50 <= 0, as.numeric(ic50_cap()), numeric_ic50),
+          numeric_ic50 = dplyr::if_else(numeric_ic50 <= 0,
+                                        as.numeric(ic50_cap()),
+                                        numeric_ic50),
           potency      = 1 / numeric_ic50
         )
 

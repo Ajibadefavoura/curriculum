@@ -55,10 +55,12 @@ mod_qcreport_server <- function(id, qc_data, neut_data, experiment_name, analyst
       req(qc_data())
       qc_data() %>%
         dplyr::mutate(cell_label = dplyr::case_when(
-          grepl("Inactive",  qc_status) ~ "No curve",
-          grepl("FAIL",      qc_status) ~ glue::glue("> {ic50_display} \u274c"),
-          grepl("Ambiguous", qc_status) ~ glue::glue("~{ic50_display} \u26a0"),
-          TRUE ~ as.character(ic50_display)
+          grepl("Inactive",  qc_status) ~ "Inactive",
+          grepl("FAIL",      qc_status) &
+            ic50_classification == "Solver pathology" ~ "ND (fit error)",
+          grepl("FAIL",      qc_status) ~ paste0(ic50_censored, " \u274c"),
+          grepl("Ambiguous", qc_status) ~ paste0("~", ic50_censored, " \u26a0"),
+          TRUE ~ as.character(ic50_censored)
         )) %>%
         dplyr::select(sample_id, serotype, cell_label) %>%
         tidyr::pivot_wider(names_from = serotype, values_from = cell_label) %>%
@@ -95,20 +97,35 @@ mod_qcreport_server <- function(id, qc_data, neut_data, experiment_name, analyst
 
     output$qc_detail <- DT::renderDT({
       req(qc_data())
-      detail_df <- qc_data() %>%
-        dplyr::select(sample_id, serotype, plate, ic50_display, hill_slope,
-                      r_squared, ci_lower, ci_upper, fit_status, ic50_type,
-                      qc_status, qc_detail, flags) %>%
+      d <- qc_data()
+      have_class <- "ic50_classification" %in% names(d)
+      have_rep   <- "ic50_report" %in% names(d)
+      cols_pick <- c("sample_id", "serotype", "plate",
+                     if (have_rep) "ic50_report",
+                     "ic50_display",
+                     if (have_class) "ic50_classification",
+                     "hill_slope", "r_squared", "ci_lower", "ci_upper",
+                     "fit_status", "ic50_type",
+                     "qc_status", "qc_detail", "flags")
+      detail_df <- d %>%
+        dplyr::select(dplyr::any_of(cols_pick)) %>%
         dplyr::mutate(hill_slope = round(hill_slope, 3),
                       r_squared  = round(r_squared, 3),
                       ci_lower   = round(ci_lower, 2),
                       ci_upper   = round(ci_upper, 2)) %>%
-        dplyr::arrange(serotype, sample_id) %>%
-        dplyr::rename("Sample" = sample_id, "Serotype" = serotype, "Plate" = plate,
-                      "IC50" = ic50_display, "Hill Slope" = hill_slope,
-                      "R Squared" = r_squared, "CI Lower" = ci_lower, "CI Upper" = ci_upper,
-                      "Fit Status" = fit_status, "IC50 Type" = ic50_type,
-                      "QC Status" = qc_status, "QC Detail" = qc_detail, "Flags" = flags)
+        dplyr::arrange(serotype, sample_id)
+      rename_map <- c("Sample" = "sample_id", "Serotype" = "serotype",
+                      "Plate" = "plate", "IC50 Reported" = "ic50_report",
+                      "IC50" = "ic50_display",
+                      "IC50 Classification" = "ic50_classification",
+                      "Hill Slope" = "hill_slope",
+                      "R Squared" = "r_squared",
+                      "CI Lower" = "ci_lower", "CI Upper" = "ci_upper",
+                      "Fit Status" = "fit_status", "IC50 Type" = "ic50_type",
+                      "QC Status" = "qc_status", "QC Detail" = "qc_detail",
+                      "Flags" = "flags")
+      detail_df <- detail_df %>%
+        dplyr::rename(dplyr::any_of(rename_map))
       DT::datatable(detail_df, filter = "top", rownames = FALSE,
                     options = list(pageLength = 25, scrollX = TRUE)) %>%
         DT::formatStyle(columns = "QC Status",

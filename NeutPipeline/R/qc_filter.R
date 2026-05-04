@@ -29,6 +29,8 @@ apply_qc <- function(fit_df, cfg, sample_type = "mab") {
 
       qc_detail = dplyr::case_when(
         fit_status == "Inactive"  ~ "No neutralization detected",
+        fit_status == "FitFailed" & ic50_classification == "Solver pathology" ~
+          paste0("FAIL (solver pathology): ", flags),
         fit_status == "FitFailed" ~ paste("Curve fitting failed:", flags),
         fail_hill & fail_r2 ~ glue::glue(
           "FAIL: Hill slope |{round(hill_slope, 3)}| < {cfg$qc$min_hillslope}; ",
@@ -41,7 +43,15 @@ apply_qc <- function(fit_df, cfg, sample_type = "mab") {
         fail_r2 ~ glue::glue(
           "FAIL: R\u00b2 = {round(r_squared, 3)} < {r2_threshold}"
         ),
-        warn_extrap ~ "IC50 is extrapolated",
+        ic50_classification == "< LLOQ" ~
+          sprintf("PASS (left-censored): IC50 below LLOQ; reported as %s",
+                  ic50_censored),
+        ic50_classification == "> ULOQ" ~
+          sprintf("PASS (right-censored): IC50 above ULOQ; reported as %s",
+                  ic50_censored),
+        ic50_classification == "> Cap" ~
+          sprintf("PASS: IC50 above cap; reported as %s", ic50_censored),
+        warn_extrap ~ "IC50 is extrapolated outside tested concentration range",
         TRUE        ~ "Passed all QC criteria"
       )
     ) %>%
