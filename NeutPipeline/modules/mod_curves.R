@@ -6,7 +6,8 @@ mod_curves_ui <- function(id) {
   ns <- shiny::NS(id)
   shiny::tagList(
     shinydashboard::box(
-      title = "Dose Response Curves", width = 12,
+      title  = "Dose Response Curves (Interactive)",
+      width  = 12,
       status = "primary", solidHeader = TRUE,
       shiny::fluidRow(
         shiny::column(3,
@@ -14,31 +15,36 @@ mod_curves_ui <- function(id) {
                              choices = NULL, multiple = TRUE),
           shiny::selectInput(ns("sel_sample"), "Samples",
                              choices = NULL, multiple = TRUE),
+          shiny::radioButtons(ns("facet_mode"), "Layout",
+                              choices  = c(
+                                "One Panel per Sample (Reference Grid)" = "by_sample",
+                                "One Panel per Plate"                   = "by_plate",
+                                "One Panel per Serotype"                = "by_serotype",
+                                "Single Overlay Panel"                  = "none"
+                              ),
+                              selected = "by_sample"),
+          shiny::sliderInput(ns("facet_ncol"),
+                             "Panels per Row",
+                             min = 2, max = 8, value = 5, step = 1),
           shiny::radioButtons(ns("x_scale"), "X Axis Scale",
-                              choices  = c("Log10"  = "log",
+                              choices  = c("Log10" = "log",
                                            "Linear" = "linear"),
                               selected = "log"),
-          shiny::radioButtons(ns("color_by"), "Color Curves By",
-                              choices  = c("Serotype"  = "serotype",
-                                           "Sample ID" = "sample_id"),
-                              selected = "serotype"),
-          shiny::checkboxInput(ns("show_ic50_line"),
-                               "Show IC50 Marker Line", value = TRUE),
           shiny::checkboxInput(ns("show_50pct"),
                                "Show 50% Reference Line", value = TRUE),
-          shiny::checkboxInput(ns("show_reps"),
-                               "Show Individual Replicates", value = FALSE),
-          shiny::downloadButton(ns("dl_curves"), "Export Curves")
+          shiny::checkboxInput(ns("show_ic50_marks"),
+                               "Show IC50 Drop Lines", value = TRUE),
+          shiny::downloadButton(ns("dl_curves"), "Export Curves (PNG)")
         ),
         shiny::column(9,
-          plotly::plotlyOutput(ns("curve_plot"), height = "580px")
+          plotly::plotlyOutput(ns("curve_plot"), height = "640px")
         )
       )
     ),
-    # ── TASK 10 — GraphPad Prism style panel ──────────────
     shinydashboard::box(
-      title = "Prism Style 4PL Curves", width = 12, status = "info", solidHeader = TRUE,
-      shiny::plotOutput(ns("prism_curve_plot"), height = "640px")
+      title = "Publication Style 4PL Curves (Static, 300 DPI)",
+      width = 12, status = "info", solidHeader = TRUE,
+      shiny::plotOutput(ns("prism_curve_plot"), height = "780px")
     )
   )
 }
@@ -73,7 +79,7 @@ mod_curves_server <- function(id, avg_data, concs, conc_units, cfg, fit_data = N
                         log10(max(concs()) * 3),
                         length.out = 300)
       filtered() %>%
-        dplyr::group_by(serotype, sample_id) %>%
+        dplyr::group_by(serotype, plate, sample_id) %>%
         dplyr::group_modify(~ {
           x <- .x$concentration
           y <- .x$pct_neut_avg
@@ -117,14 +123,43 @@ mod_curves_server <- function(id, avg_data, concs, conc_units, cfg, fit_data = N
         dplyr::ungroup()
     })
 
-    # ── TASK 9 — High-resolution interactive curve plot ─────
+    # ── Helper: fitted IC50 marks for drop-line annotations ──
+    ic50_marks <- reactive({
+      if (is.null(fit_data) || is.null(fit_data())) return(NULL)
+      fit_data() %>%
+        dplyr::filter(
+          serotype  %in% input$sel_serotype,
+          sample_id %in% input$sel_sample,
+          is.finite(ic50),
+          ic50 > 0,
+          ic50 < cfg()$qc$ic50_cap
+        ) %>%
+        dplyr::distinct(serotype, sample_id, ic50)
+    })
+
+    # ── Shared facet helper ─────────────────────────────────
+    add_facet <- function(p, mode, ncol_v) {
+      switch(
+        mode,
+        by_sample   = p + ggplot2::facet_wrap(~ sample_id, ncol = ncol_v),
+        by_plate    = p + ggplot2::facet_wrap(~ paste0("Plate ", plate), ncol = ncol_v),
+        by_serotype = p + ggplot2::facet_wrap(~ serotype),
+        p
+      )
+    }
+
+    # ── Interactive (plotly) curve plot ──────────────────────
     output$curve_plot <- plotly::renderPlotly({
       req(filtered(), smooth_curves())
-      color_var <- input$color_by
+
+      pts   <- filtered()
+      lines <- smooth_curves() %>% dplyr::filter(!is.na(y_smooth))
+
+      color_var <- if (input$facet_mode == "by_sample") "serotype" else "sample_id"
 
       p <- ggplot2::ggplot() +
         ggplot2::geom_point(
-          data = filtered(),
+          data = pts,
           ggplot2::aes(
             x     = concentration,
             y     = pct_neut_avg,
@@ -135,25 +170,36 @@ mod_curves_server <- function(id, avg_data, concs, conc_units, cfg, fit_data = N
               "\n%Neut: {round(pct_neut_avg, 1)}%"
             )
           ),
-          size = 2.5, alpha = 0.9
+          size = 2.2, alpha = 0.9
         ) +
         ggplot2::geom_line(
-          data = smooth_curves() %>% dplyr::filter(!is.na(y_smooth)),
+          data = lines,
           ggplot2::aes(x = x_smooth, y = y_smooth,
                        color = .data[[color_var]]),
           linewidth = 0.9
         ) +
         { if (input$show_50pct)
             ggplot2::geom_hline(yintercept = 50, linetype = "dashed",
-                                color = "grey40", linewidth = 0.5) } +
-        ggplot2::scale_y_continuous(limits = c(-5, 108),
-                                   name = "% Neutralization") +
+                                color = "grey40", linewidth = 0.4) } +
+        ggplot2::scale_y_continuous(
+          breaks = c(0, 20, 40, 60, 80, 100),
+          limits = c(-5, 110),
+          name   = "% Neutralized"
+        ) +
         ggplot2::labs(
-          x     = glue::glue("Concentration ({conc_units()})"),
+          x     = "ng/mL, purified mAb",
           color = stringr::str_to_title(gsub("_", " ", color_var))
         ) +
-        ggplot2::facet_wrap(~ serotype) +
-        ggplot2::theme_classic(base_size = 12)
+        ggplot2::theme_classic(base_size = 12) +
+        ggplot2::theme(
+          axis.text  = ggplot2::element_text(face = "bold", color = "black"),
+          axis.title = ggplot2::element_text(face = "bold", color = "black"),
+          panel.grid = ggplot2::element_blank(),
+          strip.background = ggplot2::element_blank(),
+          strip.text = ggplot2::element_text(face = "bold")
+        )
+
+      p <- add_facet(p, input$facet_mode, input$facet_ncol)
 
       if (input$x_scale == "log") {
         p <- p + ggplot2::scale_x_log10(
@@ -162,57 +208,49 @@ mod_curves_server <- function(id, avg_data, concs, conc_units, cfg, fit_data = N
       }
 
       plotly::ggplotly(p, tooltip = "text") %>%
-        plotly::layout(legend = list(orientation = "h", y = -0.2))
+        plotly::layout(legend = list(orientation = "h", y = -0.18))
     })
 
-    # ── TASK 10 — GraphPad Prism aesthetic dose-response ────
-    # Curve fitting math is unchanged (same drc::LL.2 pipeline
-    # used by smooth_curves / fit_data); ONLY ggplot styling
-    # is overridden here to mimic Prism.
+    # ── Static publication-style 4PL curves ─────────────────
     prism_curve_gg <- reactive({
       req(filtered(), smooth_curves())
 
       pts   <- filtered()
       lines <- smooth_curves() %>% dplyr::filter(!is.na(y_smooth))
 
-      ic50_marks <- if (!is.null(fit_data) && !is.null(fit_data())) {
-        fit_data() %>%
-          dplyr::filter(serotype %in% input$sel_serotype,
-                        sample_id %in% input$sel_sample,
-                        is.finite(ic50)) %>%
-          dplyr::distinct(serotype, sample_id, ic50)
-      } else {
-        NULL
-      }
+      color_var <- if (input$facet_mode == "by_sample") "serotype" else "sample_id"
 
       p <- ggplot2::ggplot() +
         ggplot2::geom_point(
           data = pts,
           ggplot2::aes(x = concentration, y = pct_neut_avg,
-                       color = sample_id, shape = sample_id),
-          size = 2.6, stroke = 0.7
+                       color = .data[[color_var]],
+                       shape = .data[[color_var]]),
+          size = 2.2, stroke = 0.6
         ) +
         ggplot2::geom_line(
           data = lines,
-          ggplot2::aes(x = x_smooth, y = y_smooth, color = sample_id),
-          linewidth = 1
+          ggplot2::aes(x = x_smooth, y = y_smooth,
+                       color = .data[[color_var]]),
+          linewidth = 0.9
         ) +
         ggplot2::geom_hline(yintercept = 50, linetype = "dashed",
-                            color = "black", linewidth = 0.5)
+                            color = "black", linewidth = 0.4)
 
-      if (!is.null(ic50_marks) && nrow(ic50_marks) > 0) {
+      if (isTRUE(input$show_ic50_marks) &&
+          !is.null(ic50_marks()) && nrow(ic50_marks()) > 0) {
         p <- p +
           ggplot2::geom_segment(
-            data = ic50_marks,
+            data = ic50_marks(),
             ggplot2::aes(x = ic50, xend = ic50, y = 0, yend = 50,
-                         color = sample_id),
-            linetype = "dashed", linewidth = 0.5,
+                         color = .data[[color_var]]),
+            linetype = "dashed", linewidth = 0.4,
             inherit.aes = FALSE,
             show.legend = FALSE
           )
       }
 
-      p +
+      p <- p +
         ggplot2::scale_x_log10(
           labels = scales::trans_format("log10", scales::math_format(10^.x))
         ) +
@@ -220,24 +258,27 @@ mod_curves_server <- function(id, avg_data, concs, conc_units, cfg, fit_data = N
           breaks = c(0, 20, 40, 60, 80, 100),
           limits = c(0, 110)
         ) +
-        ggplot2::facet_wrap(~ serotype) +
         ggplot2::labs(
           x     = "ng/mL, purified mAb",
           y     = "% Neutralized",
-          color = "Sample",
-          shape = "Sample"
+          color = stringr::str_to_title(gsub("_", " ", color_var)),
+          shape = stringr::str_to_title(gsub("_", " ", color_var))
         ) +
-        ggplot2::theme_classic(base_size = 14) +
+        ggplot2::theme_classic(base_size = 13) +
         ggplot2::theme(
-          axis.line   = ggplot2::element_line(color = "black", linewidth = 0.7),
+          axis.line   = ggplot2::element_line(color = "black", linewidth = 0.6),
           axis.ticks  = ggplot2::element_line(color = "black", linewidth = 0.5),
           axis.text   = ggplot2::element_text(face = "bold", color = "black"),
           axis.title  = ggplot2::element_text(face = "bold", color = "black"),
+          panel.grid  = ggplot2::element_blank(),
+          panel.spacing = grid::unit(0.6, "lines"),
           strip.background = ggplot2::element_blank(),
-          strip.text  = ggplot2::element_text(face = "bold", size = 13),
+          strip.text  = ggplot2::element_text(face = "bold", size = 11),
           legend.position = "right",
           legend.title    = ggplot2::element_text(face = "bold")
         )
+
+      add_facet(p, input$facet_mode, input$facet_ncol)
     })
 
     output$prism_curve_plot <- shiny::renderPlot({
@@ -245,12 +286,16 @@ mod_curves_server <- function(id, avg_data, concs, conc_units, cfg, fit_data = N
       prism_curve_gg()
     }, res = 300)
 
-    # ── TASK 9 — High-res download for the Prism panel ──────
     output$dl_curves <- shiny::downloadHandler(
-      filename = function() glue::glue("dose_response_prism_{Sys.Date()}.png"),
+      filename = function() glue::glue("dose_response_{Sys.Date()}.png"),
       content  = function(file) {
+        n_panels <- length(unique(filtered()$sample_id))
+        ncols    <- max(1, input$facet_ncol)
+        nrows    <- ceiling(n_panels / ncols)
         ggplot2::ggsave(file, plot = prism_curve_gg(),
-                        width = 12, height = 8, dpi = 300, bg = "white")
+                        width  = 2.6 * ncols + 2,
+                        height = 2.4 * nrows + 1,
+                        dpi = 300, bg = "white", limitsize = FALSE)
       }
     )
   })

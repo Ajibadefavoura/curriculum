@@ -70,10 +70,11 @@ mod_charts_server <- function(id, summary_data, conc_units, ic50_cap) {
           text = glue::glue("Sample: {sample_id}\nSerotype: {serotype}\nIC50: {ic50_display} {conc_units()}\nQC: {qc_status}")
         )
       ) +
-        ggplot2::geom_col(position = ggplot2::position_dodge(width = 0.8), width = 0.7, alpha = 0.9) +
+        ggplot2::geom_col(position = ggplot2::position_dodge(width = 0.8, preserve = "single"),
+                          width = 0.7, alpha = 0.9, color = "black", linewidth = 0.3) +
         { if (input$show_errorbars && !all(is.na(d$ci_lower))) {
             ggplot2::geom_errorbar(ggplot2::aes(ymin = ci_lower, ymax = ci_upper),
-                                   position = ggplot2::position_dodge(width = 0.8),
+                                   position = ggplot2::position_dodge(width = 0.8, preserve = "single"),
                                    width = 0.25, linewidth = 0.5, color = "grey30")
         } } +
         ggplot2::geom_hline(yintercept = ic50_cap(), linetype = "dashed",
@@ -108,7 +109,8 @@ mod_charts_server <- function(id, summary_data, conc_units, ic50_cap) {
           text = glue::glue("Sample: {sample_id}\nSerotype: {serotype}\n1/IC50: {round(inv_ic50_display, 6)}\nIC50: {ic50_display} {conc_units()}\nQC: {qc_status}")
         )
       ) +
-        ggplot2::geom_col(position = ggplot2::position_dodge(width = 0.8), width = 0.7, alpha = 0.9) +
+        ggplot2::geom_col(position = ggplot2::position_dodge(width = 0.8, preserve = "single"),
+                          width = 0.7, alpha = 0.9, color = "black", linewidth = 0.3) +
         ggplot2::labs(x = NULL, y = "1 / IC50 (Potency)",
                       fill = if (input$fill_by == "serotype") "Serotype" else "QC Status") +
         ggplot2::theme_classic(base_size = 12) +
@@ -180,6 +182,18 @@ mod_charts_server <- function(id, summary_data, conc_units, ic50_cap) {
       )
       ref_lines$y <- 1 / ref_lines$ic50
 
+      # Compute axis range *from the data* so that every bar is
+      # visible — capped samples (potency = 1/20000 = 5e-5) used to
+      # be clipped because the lower limit was hard-coded at 1e-4.
+      pos_potency <- d$potency[is.finite(d$potency) & d$potency > 0]
+      y_min <- if (length(pos_potency) > 0) {
+        min(c(pos_potency, 1 / as.numeric(ic50_cap()))) * 0.5
+      } else {
+        1e-6
+      }
+      y_max <- if (length(pos_potency) > 0) max(pos_potency) * 1.5 else 1
+      log_breaks <- 10 ^ seq(floor(log10(y_min)), ceiling(log10(y_max)))
+
       ggplot2::ggplot(
         data = d,
         ggplot2::aes(
@@ -189,7 +203,7 @@ mod_charts_server <- function(id, summary_data, conc_units, ic50_cap) {
         )
       ) +
         ggplot2::geom_col(
-          position  = ggplot2::position_dodge(width = 0.8),
+          position  = ggplot2::position_dodge(width = 0.8, preserve = "single"),
           width     = 0.72,
           color     = "black",
           linewidth = 0.4
@@ -208,8 +222,8 @@ mod_charts_server <- function(id, summary_data, conc_units, ic50_cap) {
         ) +
         ggplot2::scale_y_log10(
           labels = scales::label_number(),
-          breaks = c(1e-4, 1e-3, 1e-2, 1e-1),
-          limits = c(1e-4, 1e-1),
+          breaks = log_breaks,
+          limits = c(y_min, y_max),
           expand = ggplot2::expansion(mult = c(0, 0.05))
         ) +
         ggplot2::labs(

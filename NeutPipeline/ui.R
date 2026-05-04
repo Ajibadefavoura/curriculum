@@ -79,7 +79,18 @@ body, .content-wrapper, .right-side {
   margin: 2px 8px 2px 0;
   padding: 10px 14px;
 }
-.shiny-input-container { padding: 0 14px 6px 14px; }
+.shiny-input-container { padding: 0 16px 8px 16px; width: 100%; }
+.shiny-input-container .form-control,
+.shiny-input-container .selectize-input { width: 100% !important; }
+.shiny-input-container input[type='file'] { font-size: 12px; }
+.skin-blue .sidebar .form-control,
+.skin-blue .sidebar .selectize-input {
+  background: rgba(255,255,255,0.06) !important;
+  color: #FFFFFF !important;
+  border: 1px solid rgba(255,255,255,0.15) !important;
+}
+.skin-blue .sidebar .selectize-input > input,
+.skin-blue .sidebar .selectize-dropdown { color: #1D1D1F !important; }
 .sidebar hr { border-top: 1px solid rgba(255,255,255,0.08); margin: 14px 12px; }
 
 /* ── Boxes / Panels ────────────────────────────────── */
@@ -178,7 +189,7 @@ ui <- shinydashboard::dashboardPage(
   skin = "blue",
   shinydashboard::dashboardHeader(title = "NeutPipeline Analysis"),
   shinydashboard::dashboardSidebar(
-    width = 290,
+    width = 320,
     shinydashboard::sidebarMenu(
       id = "sidebar_menu",
       shinydashboard::menuItem("Raw Data and Plate Map", tabName = "tab_raw", icon = icon("table")),
