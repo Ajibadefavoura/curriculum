@@ -338,40 +338,54 @@ body, .content-wrapper, .right-side {
 }
 .np-card__body { padding: 18px 22px; color: var(--np-text); }
 
-/* Legacy shinydashboard boxes (used only if a sub-module
-   ignores the helper). Kept light and quiet. */
-.box {
+/* Force every shinydashboard ::box (including solidHeader) into
+   the same flat white card style. Kills the 2010 'admin
+   template' blue/red/teal/orange/green saturated bars. */
+.box,
+.box.box-solid,
+.box.box-primary,
+.box.box-info,
+.box.box-success,
+.box.box-warning,
+.box.box-danger {
   background: var(--np-surface) !important;
   border: 1px solid var(--np-line) !important;
+  border-top: 1px solid var(--np-line) !important;
   border-radius: var(--np-radius) !important;
   box-shadow: var(--np-shadow-sm) !important;
   margin-bottom: 18px;
   overflow: hidden;
 }
-.box-header {
-  border-bottom: 1px solid var(--np-line-2) !important;
-  padding: 14px 20px !important;
-  background: var(--np-surface) !important;
-}
-.box-header > .box-title {
-  font-weight: 600; font-size: 14.5px;
-  letter-spacing: -0.01em;
-  color: var(--np-text) !important;
-}
+.box-header,
 .box.box-solid > .box-header,
-.box.box-solid > .box-header > .box-title {
+.box.box-primary > .box-header,
+.box.box-info > .box-header,
+.box.box-success > .box-header,
+.box.box-warning > .box-header,
+.box.box-danger > .box-header {
   background: var(--np-surface) !important;
   color: var(--np-text) !important;
+  border-bottom: 1px solid var(--np-line-2) !important;
+  border-top: none !important;
+  padding: 14px 20px !important;
 }
-.box.box-solid {
-  border-left-width: 1px !important;
+.box-header > .box-title,
+.box.box-solid > .box-header > .box-title {
+  font-weight: 600 !important;
+  font-size: 14.5px !important;
+  letter-spacing: -0.01em !important;
+  color: var(--np-text) !important;
 }
-.box.box-solid.box-primary  { border-left: 3px solid #2563EB !important; }
-.box.box-solid.box-info     { border-left: 3px solid #0EA5E9 !important; }
-.box.box-solid.box-success  { border-left: 3px solid #16A34A !important; }
-.box.box-solid.box-warning  { border-left: 3px solid #D97706 !important; }
-.box.box-solid.box-danger   { border-left: 3px solid #DC2626 !important; }
-.box-body { padding: 18px 22px !important; color: var(--np-text); }
+/* Discreet 3px left accent in place of the saturated bar */
+.box.box-primary { border-left: 3px solid #2563EB !important; }
+.box.box-info    { border-left: 3px solid #0EA5E9 !important; }
+.box.box-success { border-left: 3px solid #16A34A !important; }
+.box.box-warning { border-left: 3px solid #D97706 !important; }
+.box.box-danger  { border-left: 3px solid #DC2626 !important; }
+.box-body { padding: 18px 22px !important; color: var(--np-text); background: var(--np-surface) !important; }
+/* Box icons inside box-tools (collapse, remove) */
+.box-tools .btn-box-tool { color: var(--np-muted) !important; }
+.box-tools .btn-box-tool:hover { color: var(--np-text) !important; background: var(--np-surface-2) !important; }
 
 /* ── Buttons ────────────────────────────────────────────── */
 .btn, .btn-default, .shiny-download-link,
@@ -480,6 +494,67 @@ table.dataTable tbody tr:hover { background: var(--np-surface-2) !important; }
   background: var(--np-surface);
   overflow: hidden;
 }
+
+/* ── Value boxes (QC PASS/FAIL/Ambiguous/Inactive tiles) ── */
+.small-box {
+  border-radius: var(--np-radius) !important;
+  box-shadow: var(--np-shadow-sm) !important;
+  background: var(--np-surface) !important;
+  color: var(--np-text) !important;
+  border: 1px solid var(--np-line);
+  overflow: hidden;
+  position: relative;
+  padding: 6px;
+}
+.small-box::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 14px; bottom: 14px; width: 4px;
+  border-radius: 0 3px 3px 0;
+  background: var(--np-line);
+}
+.small-box.bg-green::before  { background: #16A34A; }
+.small-box.bg-red::before    { background: #DC2626; }
+.small-box.bg-yellow::before { background: #D97706; }
+.small-box.bg-black::before  { background: #6E6E73; }
+.small-box.bg-aqua::before,
+.small-box.bg-blue::before   { background: #2563EB; }
+.small-box.bg-green,  .small-box.bg-red,
+.small-box.bg-yellow, .small-box.bg-black,
+.small-box.bg-aqua,   .small-box.bg-blue {
+  background: var(--np-surface) !important;
+  color: var(--np-text) !important;
+}
+.small-box > .inner {
+  padding: 16px 18px 16px 22px;
+}
+.small-box > .inner > h3 {
+  font-size: 32px !important;
+  font-weight: 700 !important;
+  margin: 0 0 4px 0 !important;
+  color: var(--np-text) !important;
+  letter-spacing: -0.02em;
+}
+.small-box > .inner > p {
+  font-size: 12.5px !important;
+  font-weight: 600 !important;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--np-muted) !important;
+  margin: 0 !important;
+}
+.small-box > .icon {
+  color: var(--np-line) !important;
+  font-size: 56px !important;
+  top: 14px !important;
+  right: 18px !important;
+  opacity: 0.6;
+}
+.small-box.bg-green  > .icon { color: rgba(22,163,74,0.18) !important; }
+.small-box.bg-red    > .icon { color: rgba(220,38,38,0.18) !important; }
+.small-box.bg-yellow > .icon { color: rgba(217,119,6,0.18) !important; }
+.small-box.bg-black  > .icon { color: rgba(110,110,115,0.20) !important; }
+.small-box .small-box-footer { display: none !important; }
 
 /* ── Notifications & errors ─────────────────────────────── */
 .shiny-notification {

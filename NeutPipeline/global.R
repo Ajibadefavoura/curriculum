@@ -235,7 +235,9 @@ prettify_label <- function(x) {
       tmp <- gsub("\\bCi\\b",     "CI",   tmp, ignore.case = FALSE)
       tmp <- gsub("\\bQc\\b",     "QC",   tmp, ignore.case = FALSE)
       tmp <- gsub("\\bMab\\b",    "mAb",  tmp, ignore.case = FALSE)
-      tmp <- gsub("\\bDenv\\b",   "DENV", tmp, ignore.case = FALSE)
+      # \b doesn't fire between a letter and a digit, so match
+      # both 'Denv' alone and 'Denv1', 'Denv2' etc.
+      tmp <- gsub("\\bDenv([0-9]*)", "DENV\\1", tmp, ignore.case = FALSE)
       tmp <- gsub("\\bLloq\\b",   "LLOQ", tmp, ignore.case = FALSE)
       tmp <- gsub("\\bUloq\\b",   "ULOQ", tmp, ignore.case = FALSE)
       tmp <- gsub("\\bNd\\b",     "ND",   tmp, ignore.case = FALSE)
