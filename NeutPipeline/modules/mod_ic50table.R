@@ -63,18 +63,18 @@ mod_ic50table_server <- function(id, summary_data, cfg) {
 
     # ── TASK 1 — XLSX downloads, ASCII-clean, bold Calibri ──
     output$dl_long <- shiny::downloadHandler(
-      filename = function() glue::glue("ic50_long_{Sys.Date()}.xlsx"),
+      filename = function() glue::glue("ic50-long-{Sys.Date()}.xlsx"),
       content  = function(file) {
-        write_neut_xlsx(summary_data(), file, default_sheet = "IC50_Long")
+        write_neut_xlsx(summary_data(), file, default_sheet = "IC50 Long")
       }
     )
     output$dl_wide <- shiny::downloadHandler(
-      filename = function() glue::glue("ic50_matrix_{Sys.Date()}.xlsx"),
+      filename = function() glue::glue("ic50-matrix-{Sys.Date()}.xlsx"),
       content  = function(file) {
         write_neut_xlsx(
           pivot_ic50_wide(summary_data()),
           file,
-          default_sheet = "IC50_Matrix"
+          default_sheet = "IC50 Matrix"
         )
       }
     )

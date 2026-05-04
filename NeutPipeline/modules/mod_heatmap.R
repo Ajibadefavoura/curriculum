@@ -229,14 +229,14 @@ mod_heatmap_server <- function(id, parsed_data, neut_data = NULL) {
 
     # ── TASK 3 — High-resolution heatmap exports ────────────
     output$dl_heatmap <- shiny::downloadHandler(
-      filename = function() glue::glue("heatmap_{input$sel_serotype}_P{input$sel_plate}_{Sys.Date()}.png"),
+      filename = function() glue::glue("heatmap-{input$sel_serotype}-plate{input$sel_plate}-{Sys.Date()}.png"),
       content  = function(file) ggplot2::ggsave(file, plot = heatmap_gg(),
                                                 width = 14, height = 8,
                                                 dpi = 300, bg = "white")
     )
 
     output$dl_collective <- shiny::downloadHandler(
-      filename = function() glue::glue("collective_heatmap_{Sys.Date()}.png"),
+      filename = function() glue::glue("collective-heatmap-{Sys.Date()}.png"),
       content  = function(file) ggplot2::ggsave(file, plot = collective_gg(),
                                                 width = 14, height = 8,
                                                 dpi = 300, bg = "white")

@@ -27,13 +27,23 @@ mod_rawdata_ui <- function(id) {
 
 mod_rawdata_server <- function(id, parsed_data, plate_map, neut_data) {
   shiny::moduleServer(id, function(input, output, session) {
+    # Populate filter selectors after Run Analysis (depends on parsed_data).
     shiny::observe({
       req(parsed_data())
       serotypes <- sort(unique(parsed_data()$serotype))
       plates    <- sort(unique(parsed_data()$plate))
       shiny::updateSelectInput(session, "filter_serotype", choices = serotypes, selected = serotypes)
-      shiny::updateSelectInput(session, "filter_plate", choices = plates, selected = plates)
-      shiny::updateSelectInput(session, "preview_plate", choices = plates, selected = plates[1])
+      shiny::updateSelectInput(session, "filter_plate",    choices = plates,    selected = plates)
+    })
+
+    # Plate-map preview should be available *before* Run Analysis
+    # so the analyst can confirm the layout before kicking off the
+    # heavy pipeline. Driven directly by plate_map() (live).
+    shiny::observe({
+      req(plate_map())
+      plates <- sort(unique(plate_map()$plate))
+      shiny::updateSelectInput(session, "preview_plate", choices = plates,
+                               selected = plates[1])
     })
 
     output$plate_map_preview <- plotly::renderPlotly({
@@ -92,9 +102,9 @@ mod_rawdata_server <- function(id, parsed_data, plate_map, neut_data) {
 
     # ── TASK 1 — XLSX download, ASCII-clean, bold Calibri ───
     output$dl_raw <- shiny::downloadHandler(
-      filename = function() glue::glue("raw_ffu_{Sys.Date()}.xlsx"),
+      filename = function() glue::glue("raw-ffu-{Sys.Date()}.xlsx"),
       content  = function(file) {
-        write_neut_xlsx(filtered_raw(), file, default_sheet = "Raw_FFU")
+        write_neut_xlsx(filtered_raw(), file, default_sheet = "Raw FFU")
       }
     )
   })

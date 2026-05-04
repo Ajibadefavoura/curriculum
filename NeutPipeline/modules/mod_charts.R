@@ -253,21 +253,21 @@ mod_charts_server <- function(id, summary_data, conc_units, ic50_cap) {
 
     # ── TASK 9 — High resolution downloads ───────────────────
     output$dl_layout1 <- shiny::downloadHandler(
-      filename = function() { glue::glue("layout1_IC50_{Sys.Date()}.png") },
+      filename = function() { glue::glue("layout-1-ic50-{Sys.Date()}.png") },
       content  = function(file) {
         ggplot2::ggsave(filename = file, plot = layout1_gg(),
                         width = 14, height = 7, dpi = 300, bg = "white")
       }
     )
     output$dl_layout2 <- shiny::downloadHandler(
-      filename = function() { glue::glue("layout2_invIC50_{Sys.Date()}.png") },
+      filename = function() { glue::glue("layout-2-inverse-ic50-{Sys.Date()}.png") },
       content  = function(file) {
         ggplot2::ggsave(filename = file, plot = layout2_gg(),
                         width = 14, height = 7, dpi = 300, bg = "white")
       }
     )
     output$dl_layout2_potency <- shiny::downloadHandler(
-      filename = function() { glue::glue("layout2_potency_prism_{Sys.Date()}.png") },
+      filename = function() { glue::glue("ic50-summary-potency-{Sys.Date()}.png") },
       content  = function(file) {
         ggplot2::ggsave(filename = file, plot = layout2_potency_gg(),
                         width = 12, height = 7, dpi = 300, bg = "white")

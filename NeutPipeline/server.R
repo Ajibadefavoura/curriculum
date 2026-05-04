@@ -11,7 +11,7 @@ server <- function(input, output, session) {
 
   # ── DYNAMIC Plate Template Generator ──────────────────────
   output$dl_plate_map_template <- downloadHandler(
-    filename = function() { glue::glue("plate_map_template_{Sys.Date()}.csv") },
+    filename = function() { glue::glue("plate-map-template-{Sys.Date()}.csv") },
     content  = function(file) {
 
       if (!is.null(input$master_excel_file)) {

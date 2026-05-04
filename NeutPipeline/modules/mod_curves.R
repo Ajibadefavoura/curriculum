@@ -78,6 +78,24 @@ mod_curves_server <- function(id, avg_data, concs, conc_units, cfg, fit_data = N
       x_range <- 10^seq(log10(min(concs()) * 0.3),
                         log10(max(concs()) * 3),
                         length.out = 300)
+      # Share the same LL.2 -> LL.4 retry chain used by the master
+      # fitter in R/fit_curves.R so the smoothed overlay curve is
+      # ALWAYS consistent with the published IC50.
+      try_fit <- function(spec) {
+        tryCatch({
+          invisible(capture.output(
+            capture.output(
+              m <- suppressMessages(suppressWarnings(
+                do.call(drc::drm, spec)
+              )),
+              type = "message"
+            ),
+            type = "output"
+          ))
+          m
+        }, error = function(e) NULL)
+      }
+
       filtered() %>%
         dplyr::group_by(serotype, plate, sample_id) %>%
         dplyr::group_modify(~ {
@@ -86,30 +104,39 @@ mod_curves_server <- function(id, avg_data, concs, conc_units, cfg, fit_data = N
           keep <- is.finite(x) & x > 0 & is.finite(y)
           x <- x[keep]; y <- y[keep]
 
-          fit <- if (length(x) >= 3) {
-            tryCatch({
-              invisible(capture.output(
-                capture.output(
-                  m <- suppressMessages(suppressWarnings(
-                    drc::drm(
-                      y ~ x,
-                      fct  = drc::LL.2(upper = 100),
-                      data = data.frame(x = x, y = y),
-                      lowerl  = c(-20, min(x) / 10),
-                      upperl  = c(20,  max(x) * 10),
-                      control = drc::drmc(noMessage = TRUE)
-                    )
-                  )),
-                  type = "message"
-                ),
-                type = "output"
-              ))
-              m
-            },
-              error = function(e) NULL
+          if (length(x) < 3) {
+            return(data.frame(x_smooth = x_range,
+                              y_smooth = NA_real_))
+          }
+
+          base_data <- data.frame(x = x, y = y)
+          fit_specs <- list(
+            list(
+              formula = y ~ x, fct = drc::LL.2(upper = 100),
+              data    = base_data,
+              lowerl  = c(-20, min(x) / 10),
+              upperl  = c(20,  max(x) * 10),
+              control = drc::drmc(noMessage = TRUE)
+            ),
+            list(
+              formula = y ~ x,
+              fct     = drc::LL.4(fixed = c(NA, NA, 100, NA)),
+              data    = base_data,
+              control = drc::drmc(method = "L-BFGS-B",
+                                  noMessage = TRUE)
+            ),
+            list(
+              formula = y ~ x, fct = drc::LL.4(),
+              data    = base_data,
+              control = drc::drmc(method = "Nelder-Mead",
+                                  noMessage = TRUE)
             )
-          } else {
-            NULL
+          )
+
+          fit <- NULL
+          for (spec in fit_specs) {
+            fit <- try_fit(spec)
+            if (!is.null(fit)) break
           }
 
           if (!is.null(fit)) {
@@ -287,7 +314,7 @@ mod_curves_server <- function(id, avg_data, concs, conc_units, cfg, fit_data = N
     }, res = 300)
 
     output$dl_curves <- shiny::downloadHandler(
-      filename = function() glue::glue("dose_response_{Sys.Date()}.png"),
+      filename = function() glue::glue("dose-response-curves-{Sys.Date()}.png"),
       content  = function(file) {
         n_panels <- length(unique(filtered()$sample_id))
         ncols    <- max(1, input$facet_ncol)

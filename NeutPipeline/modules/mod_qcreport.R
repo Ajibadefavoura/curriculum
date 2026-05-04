@@ -136,15 +136,21 @@ mod_qcreport_server <- function(id, qc_data, neut_data, experiment_name, analyst
 
     # ── TASK 1 — XLSX downloads, ASCII-clean, bold Calibri ──
     output$dl_matrix <- shiny::downloadHandler(
-      filename = function() { glue::glue("qc_matrix_{experiment_name()}_{Sys.Date()}.xlsx") },
+      filename = function() {
+        exp <- gsub("[^A-Za-z0-9-]+", "-", experiment_name() %||% "")
+        glue::glue("qc-matrix-{exp}-{Sys.Date()}.xlsx")
+      },
       content  = function(file) {
-        write_neut_xlsx(qc_matrix_data(), file, default_sheet = "QC_Matrix")
+        write_neut_xlsx(qc_matrix_data(), file, default_sheet = "QC Matrix")
       }
     )
     output$dl_full <- shiny::downloadHandler(
-      filename = function() { glue::glue("qc_full_detail_{experiment_name()}_{Sys.Date()}.xlsx") },
+      filename = function() {
+        exp <- gsub("[^A-Za-z0-9-]+", "-", experiment_name() %||% "")
+        glue::glue("qc-full-detail-{exp}-{Sys.Date()}.xlsx")
+      },
       content  = function(file) {
-        write_neut_xlsx(qc_data(), file, default_sheet = "QC_Detail")
+        write_neut_xlsx(qc_data(), file, default_sheet = "QC Detail")
       }
     )
   })
