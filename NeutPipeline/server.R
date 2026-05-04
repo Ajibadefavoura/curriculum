@@ -134,13 +134,13 @@ server <- function(input, output, session) {
 
   output$plate_map_status <- renderUI({
     if (is.null(plate_map_data())) {
-      tags$p("No plate map loaded yet",
-             style = "color:#FF9F0A; padding-left:15px; font-size:11px;")
+      tags$p("No plate map loaded yet.",
+             style = "color:#D97706; font-size:12px; margin: 4px 18px 8px 18px;")
     } else {
       n_plates  <- length(unique(plate_map_data()$plate))
       n_samples <- sum(!plate_map_data()$is_vc & !plate_map_data()$is_mock)
-      tags$p(glue::glue("Plate map loaded: {n_plates} plate(s), {n_samples} sample entries"),
-             style = "color:#34C759; padding-left:15px; font-size:11px;")
+      tags$p(glue::glue("Loaded: {n_plates} plate(s), {n_samples} sample entries"),
+             style = "color:#16A34A; font-size:12px; margin: 4px 18px 8px 18px; font-weight:500;")
     }
   })
 
@@ -202,11 +202,11 @@ server <- function(input, output, session) {
   # ── Run-button feedback ──────────────────────────────────
   output$run_status <- renderUI({
     if (is.null(input$run_analysis) || input$run_analysis == 0) {
-      tags$p("Click \u2018Run Analysis\u2019 to compute results.",
-             style = "color:#0A84FF; padding-left:15px; font-size:11px; font-weight:500;")
+      tags$p("Click 'Run Analysis' to compute results.",
+             style = "color:#6E6E73; font-size:12px; margin: 6px 0 0 0;")
     } else {
       tags$p(glue::glue("Last run: {format(Sys.time(), '%H:%M:%S')}"),
-             style = "color:#34C759; padding-left:15px; font-size:11px;")
+             style = "color:#16A34A; font-size:12px; margin: 6px 0 0 0; font-weight:500;")
     }
   })
 
