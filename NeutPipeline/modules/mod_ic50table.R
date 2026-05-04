@@ -23,9 +23,9 @@ mod_ic50table_ui <- function(id) {
                                                                "Flags"="flags"),
                                                    selected = c("ic50","inv_ic50","qc_status","ic50_type"))),
         shiny::column(4, tags$br(),
-                      shiny::downloadButton(ns("dl_long"), "Download Long CSV"),
+                      shiny::downloadButton(ns("dl_long"), "Download Long XLSX"),
                       tags$br(), tags$br(),
-                      shiny::downloadButton(ns("dl_wide"), "Download Matrix CSV"))
+                      shiny::downloadButton(ns("dl_wide"), "Download Matrix XLSX"))
       ),
       DT::DTOutput(ns("ic50_table"))
     )
@@ -61,21 +61,21 @@ mod_ic50table_server <- function(id, summary_data, cfg) {
       DT::datatable(prettify_colnames(display_table()), filter = "top", rownames = FALSE)
     })
 
-    # ── TASK 5 — Sanitised CSV downloads ────────────────────
+    # ── TASK 1 — XLSX downloads, ASCII-clean, bold Calibri ──
     output$dl_long <- shiny::downloadHandler(
-      filename = function() glue::glue("ic50_long_{Sys.Date()}.csv"),
+      filename = function() glue::glue("ic50_long_{Sys.Date()}.xlsx"),
       content  = function(file) {
-        clean <- sanitize_for_export(summary_data())
-        clean <- prettify_colnames(clean)
-        write.csv(clean, file, row.names = FALSE, fileEncoding = "UTF-8")
+        write_neut_xlsx(summary_data(), file, default_sheet = "IC50_Long")
       }
     )
     output$dl_wide <- shiny::downloadHandler(
-      filename = function() glue::glue("ic50_matrix_{Sys.Date()}.csv"),
+      filename = function() glue::glue("ic50_matrix_{Sys.Date()}.xlsx"),
       content  = function(file) {
-        clean <- sanitize_for_export(pivot_ic50_wide(summary_data()))
-        clean <- prettify_colnames(clean)
-        write.csv(clean, file, row.names = FALSE, fileEncoding = "UTF-8")
+        write_neut_xlsx(
+          pivot_ic50_wide(summary_data()),
+          file,
+          default_sheet = "IC50_Matrix"
+        )
       }
     )
   })

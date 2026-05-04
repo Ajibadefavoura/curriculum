@@ -15,7 +15,7 @@ mod_rawdata_ui <- function(id) {
       shiny::fluidRow(
         shiny::column(4, shiny::selectInput(ns("filter_serotype"), "Serotype", choices = NULL, multiple = TRUE)),
         shiny::column(4, shiny::selectInput(ns("filter_plate"), "Plate", choices = NULL, multiple = TRUE)),
-        shiny::column(4, tags$br(), shiny::downloadButton(ns("dl_raw"), "Download as CSV"))
+        shiny::column(4, tags$br(), shiny::downloadButton(ns("dl_raw"), "Download as XLSX"))
       ),
       DT::DTOutput(ns("raw_table"))
     ),
@@ -90,13 +90,11 @@ mod_rawdata_server <- function(id, parsed_data, plate_map, neut_data) {
         prettify_colnames()
     }, options = list(dom = "t"), rownames = FALSE)
 
-    # ── TASK 5 — Sanitised CSV download ─────────────────────
+    # ── TASK 1 — XLSX download, ASCII-clean, bold Calibri ───
     output$dl_raw <- shiny::downloadHandler(
-      filename = function() glue::glue("raw_ffu_{Sys.Date()}.csv"),
+      filename = function() glue::glue("raw_ffu_{Sys.Date()}.xlsx"),
       content  = function(file) {
-        clean <- sanitize_for_export(filtered_raw())
-        clean <- prettify_colnames(clean)
-        write.csv(clean, file, row.names = FALSE, fileEncoding = "UTF-8")
+        write_neut_xlsx(filtered_raw(), file, default_sheet = "Raw_FFU")
       }
     )
   })

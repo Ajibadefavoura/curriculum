@@ -6,6 +6,7 @@
 library(shiny)
 library(shinydashboard)
 library(readxl)
+library(openxlsx)
 library(dplyr)
 library(tidyr)
 library(purrr)
@@ -66,14 +67,18 @@ apply_conc_convention <- function(concs, dilution_factor, convention = "prepared
 }
 
 # ── Export sanitisation helpers ───────────────────────────
-# Strip non-printable / non-ASCII glyphs from text columns and
-# strip every non-numeric character from numeric columns so the
-# downloaded CSVs are clean of encoding artefacts and stray
-# math symbols (e.g. "≥", "✅", "❌", "⚠").
+# Strip every non-ASCII / non-printable glyph from text columns
+# and every non-numeric character from numeric columns so exports
+# are clean of mojibake (e.g. "âŒ", "✅", "❌", "⚠", "≥") and
+# downstream tools (Prism, Excel) can read numeric columns
+# directly without manual cleanup.
 sanitize_text_column <- function(x) {
   s <- as.character(x)
   s <- iconv(s, from = "UTF-8", to = "ASCII", sub = "")
-  s <- gsub("[^[:print:]]", "", s)
+  # Keep only printable ASCII (space through tilde); this also
+  # removes any leftover control bytes from UTF-8 mojibake.
+  s <- gsub("[^ -~]", "", s)
+  s <- gsub("\\s+", " ", s)
   trimws(s)
 }
 
@@ -81,26 +86,43 @@ sanitize_numeric_column <- function(x) {
   if (is.numeric(x)) return(x)
   s <- as.character(x)
   s <- iconv(s, from = "UTF-8", to = "ASCII", sub = "")
-  # Keep only digits, decimal points, sign and scientific notation.
-  # Hyphen at the end of the character class is literal in POSIX.
+  # Strip Prism-incompatible prefixes such as ">", "<", "~", "≈"
+  # before parsing so values like "> 20000" or "~4.08" become
+  # pure numbers.
+  s <- gsub("[><~\u2248]", "", s)
   s <- gsub("[^[:digit:].eE+-]", "", s)
   suppressWarnings(as.numeric(s))
 }
 
+# Numeric columns that must always export as pure numbers.
+.np_numeric_cols <- c(
+  "ic50", "ic50_display", "inv_ic50", "inv_ic50_display",
+  "hill_slope", "r_squared", "ci_lower", "ci_upper",
+  "concentration", "ffu_count", "vc_avg", "vc_sd",
+  "vc_cv_pct", "mock_avg", "pct_neut", "pct_neut_avg",
+  "pct_neut_rep1", "pct_neut_rep2", "plate", "replicate",
+  "well_col", "n_reps", "potency", "numeric_ic50"
+)
+
 sanitize_for_export <- function(df) {
   if (is.null(df) || !is.data.frame(df) || nrow(df) == 0) return(df)
-  numeric_cols <- c(
-    "ic50", "ic50_display", "inv_ic50", "inv_ic50_display",
-    "hill_slope", "r_squared", "ci_lower", "ci_upper",
-    "concentration", "ffu_count", "vc_avg", "vc_sd",
-    "vc_cv_pct", "mock_avg", "pct_neut", "pct_neut_avg",
-    "pct_neut_rep1", "pct_neut_rep2", "plate", "replicate",
-    "well_col", "n_reps"
-  )
   df <- dplyr::mutate(df, dplyr::across(
-    dplyr::any_of(numeric_cols),
+    dplyr::any_of(.np_numeric_cols),
     ~ sanitize_numeric_column(.x)
   ))
+  # Also clean any column whose name *looks* numeric (e.g. the
+  # serotype-prefixed columns in the wide IC50 matrix).
+  numeric_like_cols <- grep(
+    "(?i)ic50|hill|r_squared|r2|ci_|concentration|ffu|pct|neut|potency|plate$",
+    names(df), value = TRUE
+  )
+  numeric_like_cols <- setdiff(numeric_like_cols, .np_numeric_cols)
+  if (length(numeric_like_cols) > 0) {
+    df <- dplyr::mutate(df, dplyr::across(
+      dplyr::all_of(numeric_like_cols),
+      ~ sanitize_numeric_column(.x)
+    ))
+  }
   df <- dplyr::mutate(df, dplyr::across(
     dplyr::where(is.character),
     ~ sanitize_text_column(.x)
@@ -120,3 +142,68 @@ prettify_colnames <- function(df) {
   colnames(df) <- vapply(colnames(df), prettify_label, character(1))
   df
 }
+
+# ── XLSX export (Calibri, bold headers, ASCII-clean) ──────
+# Single helper used by every download handler: writes a tidy
+# .xlsx workbook with bold Calibri headers and Prism-friendly
+# numeric columns. Accepts either a data.frame or a named list
+# of data.frames (one per worksheet).
+write_neut_xlsx <- function(data, file, default_sheet = "Sheet1") {
+  if (is.data.frame(data)) {
+    sheets <- list()
+    sheets[[default_sheet]] <- data
+  } else {
+    sheets <- data
+  }
+
+  wb <- openxlsx::createWorkbook(creator = "NeutPipeline")
+  openxlsx::modifyBaseFont(wb, fontName = "Calibri", fontSize = 11)
+
+  header_style <- openxlsx::createStyle(
+    fontName = "Calibri", fontSize = 11, textDecoration = "bold",
+    halign = "left", valign = "center",
+    fgFill = "#F2F2F2", border = "bottom", borderStyle = "thin"
+  )
+  body_style <- openxlsx::createStyle(
+    fontName = "Calibri", fontSize = 11, valign = "center"
+  )
+
+  for (sheet_name in names(sheets)) {
+    df <- sheets[[sheet_name]]
+    df <- sanitize_for_export(df)
+    df <- prettify_colnames(df)
+
+    safe_name <- substr(
+      stringr::str_replace_all(sheet_name, "[\\\\/?*:\\[\\]]", "_"),
+      1, 31
+    )
+    openxlsx::addWorksheet(wb, safe_name, gridLines = FALSE)
+    openxlsx::writeData(wb, safe_name, df, headerStyle = header_style)
+    if (nrow(df) > 0) {
+      openxlsx::addStyle(
+        wb, safe_name, body_style,
+        rows = 2:(nrow(df) + 1), cols = seq_len(ncol(df)),
+        gridExpand = TRUE, stack = TRUE
+      )
+    }
+    openxlsx::setColWidths(wb, safe_name, cols = seq_len(ncol(df)), widths = "auto")
+    openxlsx::freezePane(wb, safe_name, firstRow = TRUE)
+  }
+
+  openxlsx::saveWorkbook(wb, file = file, overwrite = TRUE)
+}
+
+# ── Heatmap palette (Ben laboratory red-to-grey) ──────────
+# Strict gradient for % Neutralization fills used by the
+# heatmap module. Higher %neut = deeper red; 0% = light grey.
+neutpipeline_heatmap_palette <- c(
+  "0"   = "#EBEBEB",
+  "25"  = "#FFF0EE",
+  "50"  = "#FFBBBB",
+  "75"  = "#FF5555",
+  "90"  = "#E02020",
+  "100" = "#B30000"
+)
+
+neutpipeline_heatmap_values  <- as.numeric(names(neutpipeline_heatmap_palette)) / 100
+neutpipeline_heatmap_colors  <- unname(neutpipeline_heatmap_palette)

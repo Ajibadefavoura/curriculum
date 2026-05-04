@@ -14,7 +14,7 @@ mod_qcreport_ui <- function(id) {
     shinydashboard::box(
       title = "QC Status Matrix — All Samples Across All Serotypes",
       width = 12, status = "primary", solidHeader = TRUE,
-      shiny::fluidRow(shiny::column(4, shiny::downloadButton(outputId = ns("dl_matrix"), label = "Download QC Matrix CSV"))),
+      shiny::fluidRow(shiny::column(4, shiny::downloadButton(outputId = ns("dl_matrix"), label = "Download QC Matrix XLSX"))),
       tags$br(), DT::DTOutput(outputId = ns("qc_matrix"))
     ),
     shinydashboard::box(title = "Plate Level Warnings", width = 12,
@@ -22,7 +22,7 @@ mod_qcreport_ui <- function(id) {
                         DT::DTOutput(outputId = ns("plate_warnings"))),
     shinydashboard::box(
       title = "Full QC Detail — All Results", width = 12, status = "info", solidHeader = TRUE,
-      shiny::fluidRow(shiny::column(4, shiny::downloadButton(outputId = ns("dl_full"), label = "Download Full QC CSV"))),
+      shiny::fluidRow(shiny::column(4, shiny::downloadButton(outputId = ns("dl_full"), label = "Download Full QC XLSX"))),
       tags$br(), DT::DTOutput(outputId = ns("qc_detail"))
     )
   )
@@ -117,21 +117,17 @@ mod_qcreport_server <- function(id, qc_data, neut_data, experiment_name, analyst
                           c("#d4edda", "#f8d7da", "#fff3cd", "#e2e3e5")))
     })
 
-    # ── TASK 5 — Sanitised CSV downloads ────────────────────
+    # ── TASK 1 — XLSX downloads, ASCII-clean, bold Calibri ──
     output$dl_matrix <- shiny::downloadHandler(
-      filename = function() { glue::glue("qc_matrix_{experiment_name()}_{Sys.Date()}.csv") },
+      filename = function() { glue::glue("qc_matrix_{experiment_name()}_{Sys.Date()}.xlsx") },
       content  = function(file) {
-        clean <- sanitize_for_export(qc_matrix_data())
-        clean <- prettify_colnames(clean)
-        write.csv(clean, file, row.names = FALSE, fileEncoding = "UTF-8")
+        write_neut_xlsx(qc_matrix_data(), file, default_sheet = "QC_Matrix")
       }
     )
     output$dl_full <- shiny::downloadHandler(
-      filename = function() { glue::glue("qc_full_detail_{experiment_name()}_{Sys.Date()}.csv") },
+      filename = function() { glue::glue("qc_full_detail_{experiment_name()}_{Sys.Date()}.xlsx") },
       content  = function(file) {
-        clean <- sanitize_for_export(qc_data())
-        clean <- prettify_colnames(clean)
-        write.csv(clean, file, row.names = FALSE, fileEncoding = "UTF-8")
+        write_neut_xlsx(qc_data(), file, default_sheet = "QC_Detail")
       }
     )
   })
