@@ -79,17 +79,27 @@ Inside each sheet, paste the 8x12 grid of FFU counts. The
 parser scans the first column for the row label `A`, then reads
 the 8 rows by 12 columns immediately to its right.
 
-### 2b. Plate map
+### 2b. Plate map — three equivalent options
 
-Two equivalent options.
+The plate map can be supplied in any of these formats. Pick whichever fits how you receive the data; the pipeline accepts all three.
 
-**Option A — embed a `plate_map` sheet inside the Excel.**
-NeutPipeline auto-detects a sheet whose name (case-insensitive)
-is exactly `plate_map`. Recommended for keeping everything in
-one file.
+**Option A — separate CSV file** (the most common workflow). For example `plate_map_denv4.csv`. You reference it from the script as:
 
-**Option B — separate CSV** (`plate_map.csv`) you reference from
-the script.
+```r
+plate_map <- "C:/Users/Ajiba/Desktop/plate_map_denv4.csv"
+```
+
+**Option B — separate XLSX file.** For example `plate_map_denv4.xlsx` (the parser uses the first sheet, or a sheet named `plate_map` if one exists). You reference it the same way:
+
+```r
+plate_map <- "C:/Users/Ajiba/Desktop/plate_map_denv4.xlsx"
+```
+
+**Option C — embedded `plate_map` sheet inside the master FFU Excel.** Add a sheet named exactly `plate_map` next to your `DENV1_P1`, `DENV2_P1`, … sheets. Then:
+
+```r
+plate_map <- NULL    # the parser auto-detects the embedded sheet
+```
 
 Either way the columns are:
 
@@ -186,7 +196,47 @@ All Excel exports are bold-Calibri with frozen header row, alternating-row bandi
 
 ---
 
-## 5. Multi-serotype / multi-plate workflow (your DENV1-4 case)
+## 4b. Single-serotype, multi-plate, two-file workflow (your DENV4 case)
+
+If you currently have **one serotype across several plates** with the FFU data and the plate map in **two separate files**, that's the most common real-world case and it's fully supported.
+
+Example: one DENV4 experiment across 3 plates, files like:
+
+```
+C:/Users/Ajiba/Desktop/Master_FFU_DENV4.xlsx
+   sheets: DENV4_P1, DENV4_P2, DENV4_P3       (FFU grids only)
+
+C:/Users/Ajiba/Desktop/plate_map_denv4.csv     (or .xlsx)
+   columns: plate, sample_id, row_start, row_end,
+            half, is_vc, is_mock
+```
+
+In `example_run.R` set:
+
+```r
+master_excel <- "C:/Users/Ajiba/Desktop/Master_FFU_DENV4.xlsx"
+plate_map    <- "C:/Users/Ajiba/Desktop/plate_map_denv4.csv"
+out_dir      <- file.path("out", format(Sys.Date(), "%Y-%m-%d"))
+```
+
+Click **Source** in RStudio. Output:
+
+| File | What's in it |
+|---|---|
+| `01-dose-response-per-sample.png` | One panel per sample, all in DENV4 colour |
+| `02-dose-response-per-plate.png` | **3 panels** — Plate 1, Plate 2, Plate 3, each with its samples coloured |
+| `03-dose-response-per-serotype.png` | **1 panel** with all DENV4 samples overlaid |
+| `04-heatmap-collective.png` | One row labelled `DENV4` × all your samples |
+| `05-heatmap-DENV4-plate-1.png`, `05-heatmap-DENV4-plate-2.png`, `05-heatmap-DENV4-plate-3.png` | **3 spatial heatmaps** |
+| `06-layout-1-ic50.png` | IC50 ng/mL bars, all in DENV4 colour |
+| `07-layout-2-potency.png` | 1/IC50 potency summary |
+| `raw-ffu.xlsx`, `ic50-long.xlsx`, `ic50-matrix.xlsx`, `qc-full-detail.xlsx` | All 3 plates merged |
+
+Same script, same command, exactly your data shape. Whatever's in the Excel + plate map is what gets analysed.
+
+---
+
+## 5. Multi-serotype / multi-plate workflow (the DENV1-4 case)
 
 You said you'll receive **DENV1 / DENV2 / DENV3 / DENV4 each with three plates**. Here's exactly how to handle that.
 

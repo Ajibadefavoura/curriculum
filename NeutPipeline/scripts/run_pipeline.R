@@ -300,7 +300,16 @@ run_pipeline <- function(master_excel,
 
   message("==> Reading plate map")
   if (!is.null(plate_map) && file.exists(plate_map)) {
-    pm <- read.csv(plate_map, stringsAsFactors = FALSE)
+    ext <- tolower(tools::file_ext(plate_map))
+    if (ext %in% c("xlsx", "xls")) {
+      pm_sheets <- readxl::excel_sheets(plate_map)
+      pm_sheet  <- pm_sheets[tolower(pm_sheets) == "plate_map"]
+      if (length(pm_sheet) == 0) pm_sheet <- pm_sheets[1]
+      pm <- as.data.frame(readxl::read_excel(plate_map, sheet = pm_sheet[1]))
+    } else {
+      sep <- if (ext == "tsv") "\t" else ","
+      pm <- read.csv(plate_map, sep = sep, stringsAsFactors = FALSE)
+    }
   } else {
     sheets <- readxl::excel_sheets(master_excel)
     pm_sheet <- sheets[tolower(sheets) == "plate_map"]

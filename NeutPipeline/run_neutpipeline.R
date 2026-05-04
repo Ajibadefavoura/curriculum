@@ -471,15 +471,40 @@ np_run <- function(master_excel,
                                  c$mixing$convention)
 
   # ── 2. Plate map ──
+  # Accept either:
+  #   - a separate CSV file (plate_map = "plate_map.csv")
+  #   - a separate XLSX file (plate_map = "plate_map.xlsx")
+  #   - or NULL, in which case we look for a 'plate_map'
+  #     sheet inside the master FFU Excel.
   log("Reading plate map")
   if (!is.null(plate_map) && file.exists(plate_map)) {
-    pm <- read.csv(plate_map, stringsAsFactors = FALSE)
+    ext <- tolower(tools::file_ext(plate_map))
+    if (ext %in% c("xlsx", "xls")) {
+      pm_sheets <- readxl::excel_sheets(plate_map)
+      pm_sheet  <- pm_sheets[tolower(pm_sheets) == "plate_map"]
+      if (length(pm_sheet) == 0) pm_sheet <- pm_sheets[1]
+      pm <- as.data.frame(readxl::read_excel(plate_map, sheet = pm_sheet[1]))
+      log("  - read plate map sheet '", pm_sheet[1],
+          "' from ", basename(plate_map))
+    } else if (ext %in% c("csv", "tsv", "txt")) {
+      sep <- if (ext == "tsv") "\t" else ","
+      pm <- read.csv(plate_map, sep = sep, stringsAsFactors = FALSE)
+      log("  - read plate map from ", basename(plate_map))
+    } else {
+      stop("Unsupported plate_map extension: ", ext,
+           " (expected .csv, .tsv, .xlsx, or .xls)")
+    }
   } else {
     sheets <- readxl::excel_sheets(master_excel)
     pm_sheet <- sheets[tolower(sheets) == "plate_map"]
-    if (length(pm_sheet) == 0)
-      stop("No plate map provided and no 'plate_map' sheet inside the Excel.")
+    if (length(pm_sheet) == 0) {
+      stop("No plate map provided and no 'plate_map' sheet inside ",
+           basename(master_excel),
+           ". Either pass plate_map = '<path>.csv' or '<path>.xlsx', ",
+           "or add a 'plate_map' sheet to the master Excel.")
+    }
     pm <- as.data.frame(readxl::read_excel(master_excel, sheet = pm_sheet[1]))
+    log("  - read embedded 'plate_map' sheet from ", basename(master_excel))
   }
   pm$plate     <- as.integer(pm$plate)
   pm$row_start <- toupper(trimws(pm$row_start))

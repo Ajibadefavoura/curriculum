@@ -13,11 +13,25 @@
 # setwd("C:/Users/Ajiba/Desktop/NeutPipeline")
 
 # ---- 1. EDIT THESE THREE LINES ----------------------------
+#
+# Two-file workflow (most common):
+#   master_excel = the FFU file (sheets DENV1_P1, DENV1_P2, ...)
+#   plate_map    = a SEPARATE file (.csv OR .xlsx) describing
+#                  which wells belong to which sample.
+#
+# One-file workflow:
+#   master_excel = an FFU file that ALSO contains a sheet
+#                  named exactly 'plate_map'
+#   plate_map    = NULL  (the script will find the embedded sheet)
 
-master_excel <- "C:/Users/Ajiba/Desktop/NeutPipeline/data/Experiment_2026.xlsx"
-plate_map    <- NULL  # NULL = read from the 'plate_map' sheet inside the Excel
-                      # OR provide a separate CSV path:
-                      # "C:/Users/Ajiba/Desktop/NeutPipeline/data/plate_map.csv"
+master_excel <- "C:/Users/Ajiba/Desktop/Master_FFU_DENV4.xlsx"
+
+# Two-file mode (separate plate map): point to your CSV or XLSX.
+plate_map    <- "C:/Users/Ajiba/Desktop/plate_map_denv4.csv"
+
+# One-file mode (embedded plate_map sheet): use NULL instead.
+# plate_map  <- NULL
+
 out_dir      <- file.path("out", format(Sys.Date(), "%Y-%m-%d"))
 
 # ---- 2. (Optional) override defaults from config.yml ------
