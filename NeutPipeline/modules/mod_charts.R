@@ -157,8 +157,9 @@ mod_charts_server <- function(id, summary_data, conc_units, ic50_cap) {
 
       # Establish a consistent sample ordering: EDE / control samples
       # first (if present), then samples in their natural input
-      # order. This mimics Ben's reference where EDE C8/C10 anchors
-      # the leftmost group.
+      # order. EDE C8/C10 broadly-neutralizing controls anchor the
+      # leftmost group, matching the publication-style reference
+      # layout.
       sample_levels <- d %>%
         dplyr::group_by(sample_id) %>%
         dplyr::summarise(
@@ -170,8 +171,9 @@ mod_charts_server <- function(id, summary_data, conc_units, ic50_cap) {
         dplyr::pull(sample_id)
 
       # Reference lines on the 1/IC50 axis correspond to round IC50
-      # values at 100, 1,000 and 10,000 ng/mL — exactly as drawn in
-      # Ben's "IC50 Summary (Y = 1/IC50)" panel.
+      # values at 100, 1,000 and 10,000 ng/mL — matching the
+      # publication-style "IC50 Summary (Y = 1/IC50)" reference
+      # panel.
       ref_lines <- data.frame(
         ic50  = c(100, 1000, 10000),
         label = c("IC50 = 100", "IC50 = 1,000", "IC50 = 10,000")

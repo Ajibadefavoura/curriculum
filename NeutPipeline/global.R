@@ -193,7 +193,7 @@ write_neut_xlsx <- function(data, file, default_sheet = "Sheet1") {
   openxlsx::saveWorkbook(wb, file = file, overwrite = TRUE)
 }
 
-# ── Heatmap palette (Ben laboratory red-to-grey) ──────────
+# ── Heatmap palette (laboratory red-to-grey) ─────────────
 # Strict gradient for % Neutralization fills used by the
 # heatmap module. Higher %neut = deeper red; 0% = light grey.
 neutpipeline_heatmap_palette <- c(
