@@ -60,35 +60,63 @@ mod_charts_server <- function(id, summary_data, conc_units, ic50_cap) {
 
     layout1_gg <- reactive({
       req(chart_data())
-      d <- chart_data()
+      d <- chart_data() %>%
+        dplyr::mutate(
+          ic50_plot = pmax(.Machine$double.eps,
+                           pmin(as.numeric(ic50_display),
+                                as.numeric(ic50_cap())))
+        )
+
+      # Use a log10 Y axis so capped (20 000) and quantified
+      # samples (e.g. 4 ng/mL) are simultaneously visible
+      # instead of compressing every bar onto the cap line.
+      y_min <- max(.Machine$double.eps,
+                   min(d$ic50_plot[d$ic50_plot > 0], na.rm = TRUE) / 3)
+      y_max <- as.numeric(ic50_cap()) * 1.4
+
       ggplot2::ggplot(
         data = d,
         ggplot2::aes(
-          x = reorder(.data[[input$group_by]], ic50_display),
-          y = ic50_display,
+          x = reorder(.data[[input$group_by]], ic50_plot),
+          y = ic50_plot,
           fill = .data[[input$fill_by]],
           text = glue::glue("Sample: {sample_id}\nSerotype: {serotype}\nIC50: {ic50_display} {conc_units()}\nQC: {qc_status}")
         )
       ) +
-        ggplot2::geom_col(position = ggplot2::position_dodge(width = 0.8, preserve = "single"),
-                          width = 0.7, alpha = 0.9, color = "black", linewidth = 0.3) +
-        { if (input$show_errorbars && !all(is.na(d$ci_lower))) {
-            ggplot2::geom_errorbar(ggplot2::aes(ymin = ci_lower, ymax = ci_upper),
-                                   position = ggplot2::position_dodge(width = 0.8, preserve = "single"),
-                                   width = 0.25, linewidth = 0.5, color = "grey30")
-        } } +
-        ggplot2::geom_hline(yintercept = ic50_cap(), linetype = "dashed",
-                            color = "red", linewidth = 0.6) +
-        ggplot2::annotate(geom = "text", x = -Inf, y = ic50_cap() * 1.04,
-                          label = glue::glue("Cap: {ic50_cap()} {conc_units()}"),
-                          color = "red", hjust = -0.1, size = 3) +
-        ggplot2::scale_y_continuous(labels = scales::comma) +
-        ggplot2::labs(x = NULL,
-                      y = glue::glue("IC50 ({conc_units()})"),
-                      fill = if (input$fill_by == "serotype") "Serotype" else "QC Status") +
+        ggplot2::geom_col(
+          position  = ggplot2::position_dodge(width = 0.8, preserve = "single"),
+          width     = 0.72, alpha = 0.92,
+          color     = "black", linewidth = 0.35
+        ) +
+        ggplot2::geom_hline(
+          yintercept = ic50_cap(),
+          linetype   = "dashed", color = "#DC2626", linewidth = 0.5
+        ) +
+        ggplot2::annotate(
+          geom = "text", x = 0.6, y = ic50_cap() * 1.05,
+          label = glue::glue("Cap: {ic50_cap()} {conc_units()}"),
+          color = "#DC2626", hjust = 0, size = 3.2, fontface = "bold"
+        ) +
+        ggplot2::scale_y_log10(
+          labels = scales::label_number(big.mark = ",",
+                                        scale_cut = scales::cut_short_scale()),
+          limits = c(y_min, y_max),
+          expand = ggplot2::expansion(mult = c(0, 0.05))
+        ) +
+        ggplot2::labs(
+          x    = NULL,
+          y    = glue::glue("IC50 ({conc_units()}) - log scale"),
+          fill = if (input$fill_by == "serotype") "Serotype" else "QC Status"
+        ) +
         ggplot2::theme_classic(base_size = 12) +
-        ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 45, hjust = 1, size = 10),
-                       legend.position = "bottom")
+        ggplot2::theme(
+          axis.text.x = ggplot2::element_text(angle = 45, hjust = 1,
+                                              size = 10, color = "black"),
+          axis.text.y = ggplot2::element_text(color = "black"),
+          axis.line   = ggplot2::element_line(color = "black", linewidth = 0.5),
+          panel.grid  = ggplot2::element_blank(),
+          legend.position = "bottom"
+        )
     })
 
     output$layout1_plot <- plotly::renderPlotly({

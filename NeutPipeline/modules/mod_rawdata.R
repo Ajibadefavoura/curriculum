@@ -70,10 +70,17 @@ mod_rawdata_server <- function(id, parsed_data, plate_map, neut_data) {
                                         fill = group,
                                         text = glue::glue("Position: {row}{col}\nSample: {label}"))) +
         ggplot2::geom_tile(color = "white", linewidth = 0.8) +
-        ggplot2::geom_text(ggplot2::aes(label = label), size = 2.5, color = "black") +
+        ggplot2::geom_text(ggplot2::aes(label = label),
+                           size = 2.5, color = "black") +
         ggplot2::scale_x_continuous(breaks = 1:12) +
+        ggplot2::labs(x = "Column", y = "Row", fill = "Group") +
         ggplot2::theme_minimal(base_size = 11) +
-        ggplot2::theme(panel.grid = ggplot2::element_blank())
+        ggplot2::theme(
+          panel.grid = ggplot2::element_blank(),
+          axis.text  = ggplot2::element_text(color = "black"),
+          axis.title = ggplot2::element_text(color = "black"),
+          legend.position = "right"
+        )
       plotly::ggplotly(p, tooltip = "text")
     })
 
