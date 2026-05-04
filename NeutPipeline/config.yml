@@ -1,0 +1,49 @@
+# ============================================================
+# NeutPipeline — config.yml
+# ============================================================
+
+plate_layout:
+  n_rows: 8
+  n_cols: 12
+  vc_row_default: "G"
+  mock_row_default: "H"
+  left_half_cols: [1,2,3,4,5,6]
+  right_half_cols: [7,8,9,10,11,12]
+  left_direction: "ascending"
+  right_direction: "descending"
+
+concentration:
+  starting_conc: 10000
+  dilution_fold: 4
+  n_steps: 6
+  units: "ng/mL"
+
+mixing:
+  vol_antibody_ul: 50
+  vol_virus_ul: 50
+  convention: "prepared"
+
+curve_fitting:
+  model: "4PL"
+  bottom: 0
+  top: 100
+  free_bottom: false
+  free_top: false
+  max_iter: 10000
+  ci_level: 0.95
+  sample_type: "mab"
+
+qc:
+  min_hillslope: 0.5
+  min_r2_mab: 0.85
+  min_r2_poly: 0.75
+  ic50_cap: 20000
+  ic50_floor: 1e-10
+  max_vc_cv_pct: 20
+  max_mock_bg_pct: 5
+  min_max_neut_pct: 20
+
+export:
+  decimal_places: 2
+  dpi: 300
+  default_format: "PNG"
