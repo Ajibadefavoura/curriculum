@@ -79,23 +79,34 @@ fit_single_curve <- function(df, cfg, conc_col) {
       TRUE                             ~ "Extrapolated (above range)"
     )
 
+    # ── TASK 5 — Impossible-fit capping ──────────────────────
+    # An IC50 below the floor (default 1e-10 ng/mL) is biologically
+    # meaningless and is always a solver pathology (boundary hit,
+    # near-flat curve, divide-by-zero in LL.2). Cap it to ic50_cap
+    # AND mark the fit as failed so QC propagates "FAIL".
+    impossibly_small <- !is.na(ic50) && ic50 < ic50_floor
+    impossibly_large <- !is.na(ic50) && ic50 > ic50_cap
+
     flags <- c(
       inactive_flag,
-      if (!is.na(ic50) && ic50 < ic50_floor) "IC50 capped",
-      if (!is.na(ic50) && ic50 > ic50_cap)   "IC50 capped"
+      if (impossibly_small) "IC50 below floor; capped (fit error)",
+      if (impossibly_large) "IC50 above cap; capped"
     )
 
     ic50_final <- dplyr::case_when(
-      is.na(ic50)          ~ ic50_cap,
-      ic50 < ic50_floor    ~ ic50_cap,
-      ic50 > ic50_cap      ~ ic50_cap,
-      TRUE                 ~ ic50
+      is.na(ic50)       ~ ic50_cap,
+      impossibly_small  ~ ic50_cap,
+      impossibly_large  ~ ic50_cap,
+      TRUE              ~ ic50
     )
 
+    final_status <- if (impossibly_small) "FitFailed" else "Fitted"
+    final_type   <- if (impossibly_small) "Capped"    else ic50_type
+
     make_fit_result(ic50_final, hill, r2, ci["Lower"], ci["Upper"],
-                    "Fitted",
+                    final_status,
                     paste(flags[!sapply(flags, is.null)], collapse = "; "),
-                    ic50_type, plate)
+                    final_type, plate)
 
   }, error = function(e) {
     make_fit_result(cfg$qc$ic50_cap, NA_real_, NA_real_,
