@@ -211,7 +211,7 @@ server <- function(input, output, session) {
   })
 
   mod_rawdata_server("rawdata", parsed_data = parsed_data, plate_map = plate_map_data, neut_data = neut_data)
-  mod_heatmap_server("heatmap", parsed_data = parsed_data)
+  mod_heatmap_server("heatmap", parsed_data = parsed_data, neut_data = neut_data)
   mod_curves_server("curves", avg_data = avg_data, concs = conc_series, conc_units = reactive(input$conc_units), cfg = live_cfg, fit_data = fit_data)
   mod_ic50table_server("ic50table", summary_data = summary_data, cfg = live_cfg)
   mod_charts_server("charts", summary_data = summary_data, conc_units = reactive(input$conc_units), ic50_cap = reactive(input$ic50_cap))

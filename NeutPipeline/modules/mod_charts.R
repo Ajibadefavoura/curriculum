@@ -155,39 +155,77 @@ mod_charts_server <- function(id, summary_data, conc_units, ic50_cap) {
 
       shiny::validate(shiny::need(nrow(d) > 0, "No sample data available for the potency chart."))
 
+      # Establish a consistent sample ordering: EDE / control samples
+      # first (if present), then samples in their natural input
+      # order. This mimics Ben's reference where EDE C8/C10 anchors
+      # the leftmost group.
+      sample_levels <- d %>%
+        dplyr::group_by(sample_id) %>%
+        dplyr::summarise(
+          max_potency = max(potency, na.rm = TRUE),
+          is_ctrl     = any(grepl("^ede|c8|c10", sample_id, ignore.case = TRUE)),
+          .groups = "drop"
+        ) %>%
+        dplyr::arrange(dplyr::desc(is_ctrl), sample_id) %>%
+        dplyr::pull(sample_id)
+
+      # Reference lines on the 1/IC50 axis correspond to round IC50
+      # values at 100, 1,000 and 10,000 ng/mL — exactly as drawn in
+      # Ben's "IC50 Summary (Y = 1/IC50)" panel.
+      ref_lines <- data.frame(
+        ic50  = c(100, 1000, 10000),
+        label = c("IC50 = 100", "IC50 = 1,000", "IC50 = 10,000")
+      )
+      ref_lines$y <- 1 / ref_lines$ic50
+
       ggplot2::ggplot(
         data = d,
         ggplot2::aes(
-          x    = reorder(sample_id, -potency),
+          x    = factor(sample_id, levels = sample_levels),
           y    = potency,
           fill = serotype
         )
       ) +
         ggplot2::geom_col(
-          position = ggplot2::position_dodge(width = 0.8),
-          width    = 0.72,
-          color    = "black",
+          position  = ggplot2::position_dodge(width = 0.8),
+          width     = 0.72,
+          color     = "black",
           linewidth = 0.4
         ) +
-        ggplot2::scale_y_continuous(
-          labels = scales::label_scientific(digits = 2),
-          expand = ggplot2::expansion(mult = c(0, 0.08))
+        ggplot2::geom_hline(
+          yintercept = ref_lines$y,
+          linetype   = "dashed",
+          color      = "grey30",
+          linewidth  = 0.4
+        ) +
+        ggplot2::annotate(
+          "text",
+          x = 0.7, y = ref_lines$y, label = ref_lines$label,
+          hjust = 0, vjust = -0.4, size = 3.4, color = "grey25",
+          fontface = "bold"
+        ) +
+        ggplot2::scale_y_log10(
+          labels = scales::label_number(),
+          breaks = c(1e-4, 1e-3, 1e-2, 1e-1),
+          limits = c(1e-4, 1e-1),
+          expand = ggplot2::expansion(mult = c(0, 0.05))
         ) +
         ggplot2::labs(
           x     = NULL,
           y     = "1 / IC50  (Potency)",
           fill  = "Serotype",
-          title = "Antibody Potency by Serotype"
+          title = "IC50 Summary  (Y = 1 / IC50)"
         ) +
         ggplot2::theme_classic(base_size = 14) +
         ggplot2::theme(
-          plot.title       = ggplot2::element_text(face = "bold", hjust = 0),
+          plot.title       = ggplot2::element_text(face = "bold", hjust = 0.5, size = 15),
           axis.text.x      = ggplot2::element_text(angle = 45, hjust = 1,
                                                    face = "bold", color = "black"),
           axis.text.y      = ggplot2::element_text(face = "bold", color = "black"),
           axis.title.y     = ggplot2::element_text(face = "bold"),
           axis.line        = ggplot2::element_line(color = "black", linewidth = 0.6),
           axis.ticks       = ggplot2::element_line(color = "black", linewidth = 0.5),
+          panel.grid       = ggplot2::element_blank(),
           legend.position  = "right",
           legend.title     = ggplot2::element_text(face = "bold")
         )
