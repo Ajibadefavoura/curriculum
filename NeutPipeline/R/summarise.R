@@ -47,11 +47,25 @@ build_ic50_matrix <- function(qc_df, decimals = 2) {
 
 pivot_ic50_wide <- function(summary_df) {
   value_col <- if ("ic50_report" %in% names(summary_df)) "ic50_report" else "ic50_display"
-  summary_df %>%
+  wide <- summary_df %>%
     dplyr::select(sample_id, serotype, dplyr::all_of(value_col), qc_status) %>%
     tidyr::pivot_wider(
       names_from  = serotype,
       values_from = c(dplyr::all_of(value_col), qc_status),
-      names_glue  = "{serotype}_{.value}"
+      names_glue  = "{serotype} {.value}"
     )
+  # Replace internal value-suffix tokens with the publication
+  # vocabulary so the pivoted columns read as e.g.
+  # "DENV1 IC50" / "DENV1 QC Status" rather than
+  # "DENV1 ic50_report" / "DENV1 qc_status".
+  rename_map <- c(
+    "ic50_report"  = "IC50",
+    "ic50_display" = "IC50",
+    "qc_status"    = "QC Status"
+  )
+  for (key in names(rename_map)) {
+    colnames(wide) <- gsub(paste0("\\b", key, "\\b"),
+                           rename_map[[key]], colnames(wide))
+  }
+  wide
 }

@@ -66,6 +66,10 @@ apply_conc_convention <- function(concs, dilution_factor, convention = "prepared
   else concs
 }
 
+# Local null-coalescing operator (rlang / shiny re-export it but
+# define locally so older R installs work too).
+`%||%` <- function(a, b) if (is.null(a) || (length(a) == 1 && is.na(a))) b else a
+
 # ── Export sanitisation helpers ───────────────────────────
 # Strip every non-ASCII / non-printable glyph from text columns
 # and every non-numeric character from numeric columns so exports
@@ -98,10 +102,22 @@ sanitize_numeric_column <- function(x) {
 .np_numeric_cols <- c(
   "ic50", "ic50_display", "inv_ic50", "inv_ic50_display",
   "hill_slope", "r_squared", "ci_lower", "ci_upper",
+  "lloq", "uloq",
   "concentration", "ffu_count", "vc_avg", "vc_sd",
   "vc_cv_pct", "mock_avg", "pct_neut", "pct_neut_avg",
   "pct_neut_rep1", "pct_neut_rep2", "plate", "replicate",
   "well_col", "n_reps", "potency", "numeric_ic50"
+)
+
+# Columns whose values are deliberately string-censored
+# ("< LLOQ", "> 20000", "ND", "Inactive") and must therefore
+# NEVER be coerced to numeric, even though the column name looks
+# numeric to the auto-detector.
+.np_string_only_cols <- c(
+  "ic50_censored", "ic50_report", "ic50_classification",
+  "ic50_type", "fit_status", "qc_status", "qc_detail",
+  "flags", "plate_vc_flag", "plate_mock_flag",
+  "ffu", "vc", "mock"
 )
 
 sanitize_for_export <- function(df) {
@@ -110,18 +126,26 @@ sanitize_for_export <- function(df) {
     dplyr::any_of(.np_numeric_cols),
     ~ sanitize_numeric_column(.x)
   ))
-  # Also clean any column whose name *looks* numeric (e.g. the
-  # serotype-prefixed columns in the wide IC50 matrix).
+
+  # Auto-detect "looks numeric" columns by name (e.g. the
+  # serotype-prefixed columns in the wide IC50 matrix), but
+  # exclude both the explicit numeric list and the string-only
+  # censored columns.
   numeric_like_cols <- grep(
-    "(?i)ic50|hill|r_squared|r2|ci_|concentration|ffu|pct|neut|potency|plate$",
+    "(?i)ic50|hill|r_squared|r2|ci_|concentration|ffu|pct|neut|potency|plate$|lloq|uloq",
     names(df), value = TRUE
   )
-  numeric_like_cols <- setdiff(numeric_like_cols, .np_numeric_cols)
-  if (length(numeric_like_cols) > 0) {
-    df <- dplyr::mutate(df, dplyr::across(
-      dplyr::all_of(numeric_like_cols),
-      ~ sanitize_numeric_column(.x)
-    ))
+  numeric_like_cols <- setdiff(numeric_like_cols,
+                               c(.np_numeric_cols, .np_string_only_cols))
+  # Also exclude any column whose values are clearly censored
+  # strings (contain "<", ">", "ND", "LLOQ", "ULOQ", "Inactive").
+  censored_pattern <- "<|>|ND|LLOQ|ULOQ|Inactive|FAIL|PASS|Ambiguous"
+  for (col in numeric_like_cols) {
+    vals <- as.character(df[[col]])
+    if (any(grepl(censored_pattern, vals, ignore.case = FALSE))) {
+      next
+    }
+    df[[col]] <- sanitize_numeric_column(df[[col]])
   }
   df <- dplyr::mutate(df, dplyr::across(
     dplyr::where(is.character),
@@ -130,16 +154,101 @@ sanitize_for_export <- function(df) {
   df
 }
 
-# ── UI label prettifier ───────────────────────────────────
+# ── UI label prettifier (domain-aware) ────────────────────
+# Converts internal snake_case identifiers into publication-ready
+# headings. Domain-specific tokens (IC50, FFU, VC, CV, R squared,
+# 95% CI, Hill slope, %neut, etc.) preserve their accepted
+# capitalisation; everything else falls back to Title Case.
+.np_label_dictionary <- c(
+  "ic50"               = "IC50",
+  "ic50_display"       = "IC50",
+  "ic50_report"        = "IC50",
+  "ic50_censored"      = "IC50 (Reported)",
+  "ic50_classification"= "IC50 Classification",
+  "ic50_type"          = "IC50 Type",
+  "ic50_cap"           = "IC50 Cap",
+  "ic50_floor"         = "IC50 Floor",
+  "inv_ic50"           = "1 / IC50",
+  "inv_ic50_display"   = "1 / IC50",
+  "lloq"               = "LLOQ",
+  "uloq"               = "ULOQ",
+  "hill_slope"         = "Hill Slope",
+  "min_hillslope"      = "Min Hill Slope",
+  "r_squared"          = "R Squared",
+  "min_r2_mab"         = "Min R Squared (mAb)",
+  "min_r2_poly"        = "Min R Squared (Polyclonal)",
+  "ci_lower"           = "CI Lower",
+  "ci_upper"           = "CI Upper",
+  "ci_level"           = "CI Level",
+  "ffu"                = "FFU",
+  "ffu_count"          = "FFU Count",
+  "vc"                 = "VC",
+  "mock"               = "Mock",
+  "vc_avg"             = "VC Mean",
+  "vc_sd"              = "VC SD",
+  "vc_cv_pct"          = "VC CV (%)",
+  "max_vc_cv_pct"      = "Max VC CV (%)",
+  "mock_avg"           = "Mock Mean",
+  "max_mock_bg_pct"    = "Max Mock Background (%)",
+  "min_max_neut_pct"   = "Min Max %Neut",
+  "pct_neut"           = "% Neutralization",
+  "pct_neut_avg"       = "% Neutralization (Mean)",
+  "pct_neut_rep1"      = "% Neutralization (Rep 1)",
+  "pct_neut_rep2"      = "% Neutralization (Rep 2)",
+  "pct_neut_raw"       = "% Neutralization (Raw)",
+  "n_reps"             = "Replicates",
+  "well_row"           = "Well Row",
+  "well_col"           = "Well Column",
+  "sample_id"          = "Sample",
+  "fit_status"         = "Fit Status",
+  "qc_status"          = "QC Status",
+  "qc_detail"          = "QC Detail",
+  "plate_vc_flag"      = "Plate VC Flag",
+  "plate_mock_flag"    = "Plate Mock Flag",
+  "experiment_name"    = "Experiment",
+  "analyst_name"       = "Analyst",
+  "row_start"          = "Row Start",
+  "row_end"            = "Row End",
+  "is_vc"              = "Is VC",
+  "is_mock"            = "Is Mock",
+  "concentration"      = "Concentration",
+  "potency"            = "Potency"
+)
+
 prettify_label <- function(x) {
   s <- as.character(x)
-  s <- gsub("_", " ", s)
-  tools::toTitleCase(tolower(s))
+  out <- character(length(s))
+  for (i in seq_along(s)) {
+    key <- s[i]
+    key_lc <- tolower(key)
+    if (!is.na(key) && key_lc %in% names(.np_label_dictionary)) {
+      out[i] <- .np_label_dictionary[[key_lc]]
+    } else {
+      tmp <- gsub("_", " ", key)
+      tmp <- tools::toTitleCase(tolower(tmp))
+      # Re-uppercase common scientific abbreviations.
+      tmp <- gsub("\\bIc50\\b",   "IC50", tmp, ignore.case = FALSE)
+      tmp <- gsub("\\bFfu\\b",    "FFU",  tmp, ignore.case = FALSE)
+      tmp <- gsub("\\bVc\\b",     "VC",   tmp, ignore.case = FALSE)
+      tmp <- gsub("\\bCv\\b",     "CV",   tmp, ignore.case = FALSE)
+      tmp <- gsub("\\bSd\\b",     "SD",   tmp, ignore.case = FALSE)
+      tmp <- gsub("\\bCi\\b",     "CI",   tmp, ignore.case = FALSE)
+      tmp <- gsub("\\bQc\\b",     "QC",   tmp, ignore.case = FALSE)
+      tmp <- gsub("\\bMab\\b",    "mAb",  tmp, ignore.case = FALSE)
+      tmp <- gsub("\\bDenv\\b",   "DENV", tmp, ignore.case = FALSE)
+      tmp <- gsub("\\bLloq\\b",   "LLOQ", tmp, ignore.case = FALSE)
+      tmp <- gsub("\\bUloq\\b",   "ULOQ", tmp, ignore.case = FALSE)
+      tmp <- gsub("\\bNd\\b",     "ND",   tmp, ignore.case = FALSE)
+      tmp <- gsub("\\bPct\\b",    "%",    tmp, ignore.case = FALSE)
+      out[i] <- tmp
+    }
+  }
+  out
 }
 
 prettify_colnames <- function(df) {
   if (is.null(df) || !is.data.frame(df)) return(df)
-  colnames(df) <- vapply(colnames(df), prettify_label, character(1))
+  colnames(df) <- prettify_label(colnames(df))
   df
 }
 
