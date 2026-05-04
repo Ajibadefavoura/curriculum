@@ -162,10 +162,17 @@ write_neut_xlsx <- function(data, file, default_sheet = "Sheet1") {
   header_style <- openxlsx::createStyle(
     fontName = "Calibri", fontSize = 11, textDecoration = "bold",
     halign = "left", valign = "center",
-    fgFill = "#F2F2F2", border = "bottom", borderStyle = "thin"
+    fgFill = "#1D1D1F", fontColour = "#FFFFFF",
+    border = "TopBottomLeftRight", borderStyle = "medium",
+    borderColour = "#1D1D1F"
   )
   body_style <- openxlsx::createStyle(
-    fontName = "Calibri", fontSize = 11, valign = "center"
+    fontName = "Calibri", fontSize = 11, valign = "center",
+    border = "TopBottomLeftRight", borderStyle = "thin",
+    borderColour = "#BFBFBF"
+  )
+  alt_row_style <- openxlsx::createStyle(
+    fgFill = "#F7F7FA"
   )
 
   for (sheet_name in names(sheets)) {
@@ -177,16 +184,27 @@ write_neut_xlsx <- function(data, file, default_sheet = "Sheet1") {
       stringr::str_replace_all(sheet_name, "[\\\\/?*:\\[\\]]", "_"),
       1, 31
     )
-    openxlsx::addWorksheet(wb, safe_name, gridLines = FALSE)
-    openxlsx::writeData(wb, safe_name, df, headerStyle = header_style)
+    openxlsx::addWorksheet(wb, safe_name, gridLines = TRUE)
+    openxlsx::writeData(wb, safe_name, df, headerStyle = header_style,
+                        borders = "all", borderStyle = "thin",
+                        borderColour = "#BFBFBF")
     if (nrow(df) > 0) {
       openxlsx::addStyle(
         wb, safe_name, body_style,
         rows = 2:(nrow(df) + 1), cols = seq_len(ncol(df)),
         gridExpand = TRUE, stack = TRUE
       )
+      alt_rows <- seq(3, nrow(df) + 1, by = 2)
+      if (length(alt_rows) > 0) {
+        openxlsx::addStyle(
+          wb, safe_name, alt_row_style,
+          rows = alt_rows, cols = seq_len(ncol(df)),
+          gridExpand = TRUE, stack = TRUE
+        )
+      }
     }
     openxlsx::setColWidths(wb, safe_name, cols = seq_len(ncol(df)), widths = "auto")
+    openxlsx::setRowHeights(wb, safe_name, rows = 1, heights = 22)
     openxlsx::freezePane(wb, safe_name, firstRow = TRUE)
   }
 

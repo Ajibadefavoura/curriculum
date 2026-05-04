@@ -40,26 +40,71 @@ fit_single_curve <- function(df, cfg, conc_col) {
   ic50_floor <- as.numeric(cfg$qc$ic50_floor)
   ic50_cap   <- as.numeric(cfg$qc$ic50_cap)
 
-  fit_result <- tryCatch({
-    invisible(capture.output(
-      capture.output(
-        model <- suppressMessages(suppressWarnings(drc::drm(
-          y ~ x,
-          fct  = drc::LL.2(upper = 100),
-          data = data.frame(x = x, y = y),
-          lowerl  = c(-20, ic50_floor),
-          upperl  = c(20,  ic50_cap * 10),
-          control = drc::drmc(maxIt = cfg$curve_fitting$max_iter,
-                              noMessage = TRUE)
-        ))),
-        type = "message"
-      ),
-      type = "output"
+  # ── Solver helper: try several drc fits before giving up ──
+  # Some samples that look fittable to Prism cause the default
+  # Nelder-Mead in drc to hit "Convergence failed". We retry with
+  # progressively more permissive specifications:
+  #   1. LL.2 with upper=100 (current default — fast, constrained)
+  #   2. LL.4 with upper=100 floating-bottom (LM optimiser)
+  #   3. LL.4 fully free (last resort)
+  # Curve-fitting math is unchanged; this only adds robustness.
+  try_fit <- function(spec) {
+    tryCatch({
+      invisible(capture.output(
+        capture.output(
+          m <- suppressMessages(suppressWarnings(do.call(drc::drm, spec))),
+          type = "message"
+        ),
+        type = "output"
+      ))
+      m
+    }, error = function(e) NULL)
+  }
+
+  base_data <- data.frame(x = x, y = y)
+  fit_specs <- list(
+    list(
+      formula = y ~ x, fct = drc::LL.2(upper = 100), data = base_data,
+      lowerl  = c(-20, ic50_floor),
+      upperl  = c(20,  ic50_cap * 10),
+      control = drc::drmc(maxIt = cfg$curve_fitting$max_iter, noMessage = TRUE)
+    ),
+    list(
+      formula = y ~ x,
+      fct     = drc::LL.4(fixed = c(NA, NA, 100, NA)),
+      data    = base_data,
+      control = drc::drmc(method = "L-BFGS-B",
+                          maxIt = cfg$curve_fitting$max_iter,
+                          noMessage = TRUE)
+    ),
+    list(
+      formula = y ~ x, fct = drc::LL.4(), data = base_data,
+      control = drc::drmc(method = "Nelder-Mead",
+                          maxIt = cfg$curve_fitting$max_iter,
+                          noMessage = TRUE)
+    )
+  )
+
+  model <- NULL
+  for (spec in fit_specs) {
+    model <- try_fit(spec)
+    if (!is.null(model)) break
+  }
+  if (is.null(model)) {
+    return(make_fit_result(
+      ic50_cap, NA_real_, NA_real_, NA_real_, NA_real_, "FitFailed",
+      "Curve fitting failed: solver did not converge after LL.2/LL.4 retries",
+      "Capped", plate
     ))
+  }
+
+  fit_result <- tryCatch({
 
     ic50 <- drc::ED(model, 50, type = "absolute",
                     display = FALSE)[1, "Estimate"]
-    hill <- abs(coef(model)[["b:(Intercept)"]])
+    coefs <- coef(model)
+    hill_name <- grep("^b:", names(coefs), value = TRUE)[1]
+    hill <- if (!is.na(hill_name)) abs(coefs[[hill_name]]) else NA_real_
 
     ci <- tryCatch({
       drc::ED(model, 50, type = "absolute", interval = "delta",
