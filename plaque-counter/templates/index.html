@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PlaqueScope — Virus Plaque Counter</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-brand">
+            <span class="logo">&#x1F52C;</span>
+            <h1>PlaqueScope</h1>
+        </div>
+        <div class="nav-links">
+            <a href="#counter" class="nav-link active" data-tab="counter">Plaque Counter</a>
+            <a href="#titer" class="nav-link" data-tab="titer">Titer Estimation</a>
+            <a href="#about" class="nav-link" data-tab="about">About</a>
+        </div>
+    </nav>
+
+    <main class="container">
+        <!-- Plaque Counter Tab -->
+        <section id="counter" class="tab-content active">
+            <div class="hero">
+                <h2>Automated Virus Plaque Counter</h2>
+                <p>Upload well images or use the sample to count plaques with advanced image processing.</p>
+            </div>
+
+            <div class="workspace">
+                <div class="panel upload-panel">
+                    <h3>Image Input</h3>
+                    <div class="drop-zone" id="dropZone">
+                        <div class="drop-icon">&#128248;</div>
+                        <p>Drag & drop well image here</p>
+                        <p class="drop-hint">or click to browse</p>
+                        <input type="file" id="fileInput" accept=".png,.jpg,.jpeg,.tif,.tiff,.bmp" hidden>
+                    </div>
+                    <div class="upload-actions">
+                        <button class="btn btn-secondary" id="sampleBtn">Use Sample Image</button>
+                    </div>
+
+                    <div class="params-section">
+                        <h4>Detection Parameters</h4>
+                        <div class="param-toggle">
+                            <label class="switch">
+                                <input type="checkbox" id="autoMode" checked>
+                                <span class="slider"></span>
+                            </label>
+                            <span>Automatic Mode</span>
+                        </div>
+                        <div class="param-toggle">
+                            <label class="switch">
+                                <input type="checkbox" id="showSteps">
+                                <span class="slider"></span>
+                            </label>
+                            <span>Show Processing Steps</span>
+                        </div>
+
+                        <div id="manualParams" class="manual-params hidden">
+                            <div class="param-group">
+                                <label>Color Channel
+                                    <select id="paramChannel">
+                                        <option value="auto">Auto</option>
+                                        <option value="gray">Grayscale</option>
+                                        <option value="red">Red</option>
+                                        <option value="green">Green</option>
+                                        <option value="blue">Blue</option>
+                                        <option value="hue">Hue</option>
+                                        <option value="saturation">Saturation</option>
+                                        <option value="value">Value</option>
+                                        <option value="lab_l">LAB Lightness</option>
+                                    </select>
+                                </label>
+                            </div>
+                            <div class="param-group">
+                                <label>Blur Sigma
+                                    <input type="range" id="paramBlur" min="0.5" max="10" step="0.5" value="2">
+                                    <span class="param-value" id="paramBlurVal">2.0</span>
+                                </label>
+                            </div>
+                            <div class="param-group">
+                                <label>Threshold Method
+                                    <select id="paramThreshold">
+                                        <option value="adaptive">Adaptive</option>
+                                        <option value="otsu">Otsu</option>
+                                        <option value="global">Global</option>
+                                    </select>
+                                </label>
+                            </div>
+                            <div class="param-group">
+                                <label>Threshold Block Size
+                                    <input type="range" id="paramBlockSize" min="3" max="101" step="2" value="35">
+                                    <span class="param-value" id="paramBlockSizeVal">35</span>
+                                </label>
+                            </div>
+                            <div class="param-group">
+                                <label>Threshold C
+                                    <input type="range" id="paramC" min="0" max="30" step="1" value="10">
+                                    <span class="param-value" id="paramCVal">10</span>
+                                </label>
+                            </div>
+                            <div class="param-group">
+                                <label>Min Plaque Area (px)
+                                    <input type="range" id="paramMinArea" min="5" max="500" step="5" value="30">
+                                    <span class="param-value" id="paramMinAreaVal">30</span>
+                                </label>
+                            </div>
+                            <div class="param-group">
+                                <label>Max Plaque Area (px)
+                                    <input type="range" id="paramMaxArea" min="500" max="20000" step="100" value="5000">
+                                    <span class="param-value" id="paramMaxAreaVal">5000</span>
+                                </label>
+                            </div>
+                            <div class="param-group">
+                                <label>Min Circularity
+                                    <input type="range" id="paramCirc" min="0" max="1" step="0.05" value="0.3">
+                                    <span class="param-value" id="paramCircVal">0.30</span>
+                                </label>
+                            </div>
+                            <div class="param-group">
+                                <label>Contrast Alpha
+                                    <input type="range" id="paramAlpha" min="0.5" max="5" step="0.1" value="1.5">
+                                    <span class="param-value" id="paramAlphaVal">1.5</span>
+                                </label>
+                            </div>
+                            <div class="param-group">
+                                <label>Well Trim (px)
+                                    <input type="range" id="paramTrim" min="0" max="50" step="1" value="15">
+                                    <span class="param-value" id="paramTrimVal">15</span>
+                                </label>
+                            </div>
+                            <div class="param-toggle">
+                                <label class="switch">
+                                    <input type="checkbox" id="paramWatershed" checked>
+                                    <span class="slider"></span>
+                                </label>
+                                <span>Watershed Segmentation</span>
+                            </div>
+                            <div class="param-toggle">
+                                <label class="switch">
+                                    <input type="checkbox" id="paramInvert" checked>
+                                    <span class="slider"></span>
+                                </label>
+                                <span>Invert (dark plaques on light bg)</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="panel results-panel">
+                    <div id="loadingOverlay" class="loading hidden">
+                        <div class="spinner"></div>
+                        <p>Analyzing image...</p>
+                    </div>
+
+                    <div id="resultsArea">
+                        <div class="placeholder">
+                            <p>Upload an image or click "Use Sample Image" to begin analysis</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Titer Estimation Tab -->
+        <section id="titer" class="tab-content">
+            <div class="hero">
+                <h2>Neutralizing Antibody Titer Estimation</h2>
+                <p>Fit dose-response curves and estimate PRNT titers from plaque count data.</p>
+            </div>
+
+            <div class="workspace">
+                <div class="panel titer-input-panel">
+                    <h3>Input Data</h3>
+                    <div class="titer-form">
+                        <div class="param-group">
+                            <label>Regression Model
+                                <select id="titerModel">
+                                    <option value="4PL">4-Parameter Logistic</option>
+                                    <option value="3PL">3-Parameter Logistic</option>
+                                    <option value="2PL">2-Parameter Logistic</option>
+                                </select>
+                            </label>
+                        </div>
+                        <div class="param-group">
+                            <label>Control Count (virus only)
+                                <input type="number" id="controlCount" min="1" value="40" class="text-input">
+                            </label>
+                        </div>
+
+                        <h4>Dilution Series</h4>
+                        <p class="hint">Enter dilution factors and corresponding plaque counts.</p>
+                        <div id="dilutionRows">
+                            <div class="dilution-row">
+                                <input type="number" placeholder="Dilution" value="10" class="dilution-input text-input">
+                                <input type="number" placeholder="Plaque Count" value="38" class="count-input text-input">
+                                <button class="btn-icon remove-row" title="Remove">&#x2715;</button>
+                            </div>
+                            <div class="dilution-row">
+                                <input type="number" placeholder="Dilution" value="20" class="dilution-input text-input">
+                                <input type="number" placeholder="Plaque Count" value="35" class="count-input text-input">
+                                <button class="btn-icon remove-row" title="Remove">&#x2715;</button>
+                            </div>
+                            <div class="dilution-row">
+                                <input type="number" placeholder="Dilution" value="40" class="dilution-input text-input">
+                                <input type="number" placeholder="Plaque Count" value="28" class="count-input text-input">
+                                <button class="btn-icon remove-row" title="Remove">&#x2715;</button>
+                            </div>
+                            <div class="dilution-row">
+                                <input type="number" placeholder="Dilution" value="80" class="dilution-input text-input">
+                                <input type="number" placeholder="Plaque Count" value="18" class="count-input text-input">
+                                <button class="btn-icon remove-row" title="Remove">&#x2715;</button>
+                            </div>
+                            <div class="dilution-row">
+                                <input type="number" placeholder="Dilution" value="160" class="dilution-input text-input">
+                                <input type="number" placeholder="Plaque Count" value="8" class="count-input text-input">
+                                <button class="btn-icon remove-row" title="Remove">&#x2715;</button>
+                            </div>
+                            <div class="dilution-row">
+                                <input type="number" placeholder="Dilution" value="320" class="dilution-input text-input">
+                                <input type="number" placeholder="Plaque Count" value="3" class="count-input text-input">
+                                <button class="btn-icon remove-row" title="Remove">&#x2715;</button>
+                            </div>
+                        </div>
+                        <button class="btn btn-secondary" id="addRowBtn">+ Add Row</button>
+
+                        <div class="param-group" style="margin-top:1rem">
+                            <label>PRNT Cutoffs (comma-separated)
+                                <input type="text" id="cutoffs" value="50,80,90" class="text-input">
+                            </label>
+                        </div>
+
+                        <button class="btn btn-primary" id="estimateTiterBtn">Estimate Titers</button>
+                        <button class="btn btn-secondary" id="loadSampleTiter">Load Sample Data</button>
+                    </div>
+                </div>
+
+                <div class="panel titer-results-panel">
+                    <div id="titerLoading" class="loading hidden">
+                        <div class="spinner"></div>
+                        <p>Fitting curve...</p>
+                    </div>
+                    <div id="titerResults">
+                        <div class="placeholder">
+                            <p>Enter dilution data and click "Estimate Titers" to see results</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- About Tab -->
+        <section id="about" class="tab-content">
+            <div class="about-content">
+                <h2>About PlaqueScope</h2>
+                <p>PlaqueScope is a modern, web-based virus plaque counter inspired by
+                   <a href="https://github.com/leahkatzelnick/Viridot" target="_blank">Viridot</a>,
+                   designed for faster, easier, and more accurate plaque analysis.</p>
+
+                <h3>Key Improvements over Viridot</h3>
+                <div class="features-grid">
+                    <div class="feature-card">
+                        <h4>Modern Web UI</h4>
+                        <p>Drag-and-drop interface with real-time preview. No R installation required.</p>
+                    </div>
+                    <div class="feature-card">
+                        <h4>Advanced Image Processing</h4>
+                        <p>Adaptive thresholding, watershed segmentation, multi-color-space analysis, and morphological refinement.</p>
+                    </div>
+                    <div class="feature-card">
+                        <h4>Per-Plaque Confidence</h4>
+                        <p>Each detected plaque gets a confidence score based on circularity and size metrics.</p>
+                    </div>
+                    <div class="feature-card">
+                        <h4>Processing Pipeline Viewer</h4>
+                        <p>See every step of the image processing pipeline to understand and optimize detection.</p>
+                    </div>
+                    <div class="feature-card">
+                        <h4>Multiple Plate Formats</h4>
+                        <p>Supports 6-, 12-, 24-, and 96-well plate formats with automatic well detection.</p>
+                    </div>
+                    <div class="feature-card">
+                        <h4>Flexible Titer Estimation</h4>
+                        <p>2PL, 3PL, and 4PL logistic regression with confidence intervals and interactive dose-response curves.</p>
+                    </div>
+                    <div class="feature-card">
+                        <h4>Zero Installation</h4>
+                        <p>Runs in any web browser. No R, no BiocManager, no EBImage setup headaches.</p>
+                    </div>
+                    <div class="feature-card">
+                        <h4>Export Everywhere</h4>
+                        <p>Export results as CSV, JSON, or annotated images with a single click.</p>
+                    </div>
+                </div>
+
+                <h3>Technology</h3>
+                <p>Built with Python, Flask, OpenCV, scikit-image, and SciPy. The frontend uses vanilla JavaScript with a modern CSS design system.</p>
+
+                <h3>Citation</h3>
+                <p>If you use this tool, please cite the original Viridot paper:</p>
+                <blockquote>
+                    Katzelnick et al. (2018). Viridot: An automated virus plaque (immunofocus) counter
+                    for the measurement of serological neutralizing responses with application to dengue virus.
+                    <em>PLoS Negl Trop Dis</em> 12(10): e0006862.
+                </blockquote>
+            </div>
+        </section>
+    </main>
+
+    <script src="/static/js/app.js"></script>
+</body>
+</html>
